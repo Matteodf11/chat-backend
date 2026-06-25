@@ -31,4 +31,18 @@ public class MessageController {
         request.setChannelId(channelId);
         return ResponseEntity.ok(messageService.saveMessage(request, principal.getName()));
     }
+
+    @GetMapping("/dm/{dmId}")
+    public ResponseEntity<List<MessageResponse>> getDmMessages(@PathVariable UUID dmId) {
+        return ResponseEntity.ok(messageService.getDmMessages(dmId));
+    }
+
+    @PostMapping("/dm/{dmId}")
+    public ResponseEntity<MessageResponse> sendDmMessage(
+            @PathVariable UUID dmId,
+            @RequestBody MessageRequest request,
+            Principal principal) {
+        request.setDmId(dmId);
+        return ResponseEntity.ok(messageService.saveMessage(request, principal.getName()));
+    }
 }

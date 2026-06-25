@@ -11,6 +11,7 @@ import com.matteo.chat_backend.repository.DirectMessageRepository;
 import com.matteo.chat_backend.repository.MessageRepository;
 import com.matteo.chat_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -67,5 +68,10 @@ public class MessageService {
                 message.getEdited(),
                 message.getCreatedAt()
         );
+    }
+
+    public List<MessageResponse> getDmMessages(UUID dmId) {
+        return messageRepository.findByDirectMessageIdOrderByCreatedAtAsc(dmId, Pageable.unpaged())
+                .stream().map(this::toResponse).collect(Collectors.toList());
     }
 }
