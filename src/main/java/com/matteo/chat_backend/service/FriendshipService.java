@@ -133,6 +133,7 @@ public class FriendshipService {
     private FriendshipResponse toResponse(Friendship f, User currentUser) {
         User friend = f.getRequester().getId().equals(currentUser.getId())
                 ? f.getReceiver() : f.getRequester();
+        boolean isIncoming = f.getReceiver().getId().equals(currentUser.getId());
         return new FriendshipResponse(
                 f.getId(),
                 friend.getId(),
@@ -140,6 +141,7 @@ public class FriendshipService {
                 friend.getAvatarUrl(),
                 friend.getIsOnline(),
                 f.getStatus(),
+                isIncoming,
                 f.getCreatedAt()
         );
     }

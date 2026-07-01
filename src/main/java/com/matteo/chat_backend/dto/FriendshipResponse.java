@@ -14,5 +14,6 @@ public class FriendshipResponse {
     private String friendAvatar;
     private Boolean friendIsOnline;
     private String status;
+    private Boolean isIncoming;
     private LocalDateTime createdAt;
 }
