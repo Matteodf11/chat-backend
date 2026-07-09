@@ -101,7 +101,7 @@ public class FriendshipService {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         DirectMessage dm = directMessageRepository.findByUser1AndUser2(user, other)
-                .or(() -> directMessageRepository.findByUser2AndUser1(other, user))
+                .or(() -> directMessageRepository.findByUser2AndUser1(user, other))
                 .orElseGet(() -> {
                     DirectMessage newDm = new DirectMessage();
                     newDm.setUser1(user);
