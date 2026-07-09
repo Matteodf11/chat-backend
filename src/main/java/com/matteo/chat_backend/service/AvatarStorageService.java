@@ -39,11 +39,25 @@ public class AvatarStorageService {
     private String avatarBucket;
 
     public String uploadAvatar(User user, MultipartFile file) {
-        validateFile(file);
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("Selecciona una imagen");
+        }
+
+        try {
+            return uploadAvatar(user, file.getBytes(), file.getContentType());
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("No se pudo leer el avatar seleccionado: " + e.getMessage(), e);
+        }
+    }
+
+    public String uploadAvatar(User user, byte[] bytes, String contentType) {
+        validateFile(bytes, contentType);
         validateConfiguration();
 
         try {
-            String extension = extensionFor(file.getContentType());
+            String extension = extensionFor(contentType);
             String objectPath = "users/" + user.getId() + "/avatar." + extension;
             String encodedPath = encodeObjectPath(objectPath);
 
@@ -51,9 +65,9 @@ public class AvatarStorageService {
                     .uri(URI.create(normalizedSupabaseUrl() + "/storage/v1/object/" + avatarBucket + "/" + encodedPath))
                     .header("Authorization", "Bearer " + serviceRoleKey)
                     .header("apikey", serviceRoleKey)
-                    .header("Content-Type", file.getContentType())
+                    .header("Content-Type", contentType)
                     .header("x-upsert", "true")
-                    .PUT(HttpRequest.BodyPublishers.ofByteArray(file.getBytes()))
+                    .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes))
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -69,14 +83,14 @@ public class AvatarStorageService {
         }
     }
 
-    private void validateFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
+    private void validateFile(byte[] bytes, String contentType) {
+        if (bytes == null || bytes.length == 0) {
             throw new RuntimeException("Selecciona una imagen");
         }
-        if (file.getSize() > MAX_AVATAR_BYTES) {
+        if (bytes.length > MAX_AVATAR_BYTES) {
             throw new RuntimeException("El avatar no puede superar 2 MB");
         }
-        if (file.getContentType() == null || !ALLOWED_CONTENT_TYPES.contains(file.getContentType().toLowerCase(Locale.ROOT))) {
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
             throw new RuntimeException("Formato de avatar no permitido");
         }
     }

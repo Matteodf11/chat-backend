@@ -39,6 +39,17 @@ public class UserController {
         return ResponseEntity.ok(userService.uploadAvatar(file, principal.getName()));
     }
 
+    @PostMapping(
+            value = "/me/avatar",
+            consumes = {MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE, "image/webp"}
+    )
+    public ResponseEntity<UserProfileResponse> uploadAvatarBytes(
+            @RequestBody byte[] bytes,
+            @RequestHeader("Content-Type") String contentType,
+            Principal principal) {
+        return ResponseEntity.ok(userService.uploadAvatar(bytes, contentType, principal.getName()));
+    }
+
     @GetMapping("/{userId}")
     public ResponseEntity<UserProfileResponse> getUserById(@PathVariable UUID userId) {
         return ResponseEntity.ok(userService.getUserById(userId));

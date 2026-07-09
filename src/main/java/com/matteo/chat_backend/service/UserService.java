@@ -69,6 +69,15 @@ public class UserService {
         return toResponse(user);
     }
 
+    public UserProfileResponse uploadAvatar(byte[] bytes, String contentType, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        String avatarUrl = avatarStorageService.uploadAvatar(user, bytes, contentType);
+        user.setAvatarUrl(avatarUrl);
+        userRepository.save(user);
+        return toResponse(user);
+    }
+
     private UserProfileResponse toResponse(User user) {
         return new UserProfileResponse(
                 user.getId(),
