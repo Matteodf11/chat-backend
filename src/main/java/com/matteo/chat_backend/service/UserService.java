@@ -78,6 +78,13 @@ public class UserService {
         return toResponse(user);
     }
 
+    public AvatarStorageService.AvatarFile getAvatar(UUID userId, String fileName) {
+        if (!userRepository.existsById(userId)) {
+            throw new RuntimeException("Usuario no encontrado");
+        }
+        return avatarStorageService.downloadAvatar(userId, fileName);
+    }
+
     private UserProfileResponse toResponse(User user) {
         return new UserProfileResponse(
                 user.getId(),

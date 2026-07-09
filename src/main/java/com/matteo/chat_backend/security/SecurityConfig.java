@@ -29,6 +29,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/ws/**", "/ws-native/**").permitAll()
+                        .requestMatchers("/api/users/*/avatar/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

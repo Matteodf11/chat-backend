@@ -14,6 +14,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -75,11 +76,39 @@ public class AvatarStorageService {
                 throw new RuntimeException("Supabase no acepto el avatar: " + response.body());
             }
 
-            return normalizedSupabaseUrl() + "/storage/v1/object/public/" + avatarBucket + "/" + encodedPath;
+            return "/api/users/" + user.getId() + "/avatar/avatar." + extension + "?v=" + System.currentTimeMillis();
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException("No se pudo subir el avatar: " + e.getMessage(), e);
+        }
+    }
+
+    public AvatarFile downloadAvatar(UUID userId, String fileName) {
+        validateConfiguration();
+
+        try {
+            String extension = extensionFromFileName(fileName);
+            String objectPath = "users/" + userId + "/avatar." + extension;
+            String encodedPath = encodeObjectPath(objectPath);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(normalizedSupabaseUrl() + "/storage/v1/object/" + avatarBucket + "/" + encodedPath))
+                    .header("Authorization", "Bearer " + serviceRoleKey)
+                    .header("apikey", serviceRoleKey)
+                    .GET()
+                    .build();
+
+            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new RuntimeException("Avatar no encontrado");
+            }
+
+            return new AvatarFile(response.body(), contentTypeFor(extension));
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("No se pudo leer el avatar: " + e.getMessage(), e);
         }
     }
 
@@ -112,11 +141,39 @@ public class AvatarStorageService {
         };
     }
 
+    private String extensionFromFileName(String fileName) {
+        if (fileName == null) {
+            throw new RuntimeException("Avatar no encontrado");
+        }
+        String lowerFileName = fileName.toLowerCase(Locale.ROOT);
+        if (lowerFileName.endsWith(".png")) {
+            return "png";
+        }
+        if (lowerFileName.endsWith(".webp")) {
+            return "webp";
+        }
+        if (lowerFileName.endsWith(".jpg") || lowerFileName.endsWith(".jpeg")) {
+            return "jpg";
+        }
+        throw new RuntimeException("Formato de avatar no permitido");
+    }
+
+    private String contentTypeFor(String extension) {
+        return switch (extension) {
+            case "png" -> "image/png";
+            case "webp" -> "image/webp";
+            default -> "image/jpeg";
+        };
+    }
+
     private String encodeObjectPath(String objectPath) {
         return URLEncoder.encode(objectPath, StandardCharsets.UTF_8).replace("+", "%20").replace("%2F", "/");
     }
 
     private String normalizedSupabaseUrl() {
         return supabaseUrl.endsWith("/") ? supabaseUrl.substring(0, supabaseUrl.length() - 1) : supabaseUrl;
+    }
+
+    public record AvatarFile(byte[] bytes, String contentType) {
     }
 }

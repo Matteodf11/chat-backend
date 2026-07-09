@@ -2,15 +2,18 @@ package com.matteo.chat_backend.controller;
 
 import com.matteo.chat_backend.dto.UpdateProfileRequest;
 import com.matteo.chat_backend.dto.UserProfileResponse;
+import com.matteo.chat_backend.service.AvatarStorageService;
 import com.matteo.chat_backend.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
+import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
 @RestController
@@ -48,6 +51,17 @@ public class UserController {
             @RequestHeader("Content-Type") String contentType,
             Principal principal) {
         return ResponseEntity.ok(userService.uploadAvatar(bytes, contentType, principal.getName()));
+    }
+
+    @GetMapping("/{userId}/avatar/{fileName}")
+    public ResponseEntity<byte[]> getAvatar(
+            @PathVariable UUID userId,
+            @PathVariable String fileName) {
+        AvatarStorageService.AvatarFile avatar = userService.getAvatar(userId, fileName);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(avatar.contentType()))
+                .cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic())
+                .body(avatar.bytes());
     }
 
     @GetMapping("/{userId}")
