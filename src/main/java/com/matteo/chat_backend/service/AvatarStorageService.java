@@ -62,8 +62,10 @@ public class AvatarStorageService {
             }
 
             return normalizedSupabaseUrl() + "/storage/v1/object/public/" + avatarBucket + "/" + encodedPath;
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("No se pudo subir el avatar", e);
+            throw new RuntimeException("No se pudo subir el avatar: " + e.getMessage(), e);
         }
     }
 
