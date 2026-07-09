@@ -167,15 +167,12 @@ public class FriendshipService {
     }
 
     private void publishFriendshipEvent(String type, Friendship friendship, User requester, User receiver) {
-        messagingTemplate.convertAndSendToUser(
-                requester.getEmail(),
-                "/queue/friends",
-                new FriendshipEvent(type, toResponse(friendship, requester))
-        );
-        messagingTemplate.convertAndSendToUser(
-                receiver.getEmail(),
-                "/queue/friends",
-                new FriendshipEvent(type, toResponse(friendship, receiver))
-        );
+        FriendshipEvent requesterEvent = new FriendshipEvent(type, toResponse(friendship, requester));
+        FriendshipEvent receiverEvent = new FriendshipEvent(type, toResponse(friendship, receiver));
+
+        messagingTemplate.convertAndSendToUser(requester.getEmail(), "/queue/friends", requesterEvent);
+        messagingTemplate.convertAndSendToUser(receiver.getEmail(), "/queue/friends", receiverEvent);
+        messagingTemplate.convertAndSend("/topic/friends." + requester.getId(), requesterEvent);
+        messagingTemplate.convertAndSend("/topic/friends." + receiver.getId(), receiverEvent);
     }
 }
