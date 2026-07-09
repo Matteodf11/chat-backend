@@ -5,6 +5,7 @@ import com.matteo.chat_backend.dto.UserProfileResponse;
 import com.matteo.chat_backend.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,7 +32,7 @@ public class UserController {
         return ResponseEntity.ok(userService.updateProfile(request, principal.getName()));
     }
 
-    @PostMapping("/me/avatar")
+    @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UserProfileResponse> uploadAvatar(
             @RequestParam("file") MultipartFile file,
             Principal principal) {
