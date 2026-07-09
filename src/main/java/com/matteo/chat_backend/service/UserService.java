@@ -95,6 +95,10 @@ public class UserService {
         presenceService.disconnectAll(email);
     }
 
+    public void markOnline(String email) {
+        presenceService.markOnline(email);
+    }
+
     private UserProfileResponse toResponse(User user) {
         return new UserProfileResponse(
                 user.getId(),

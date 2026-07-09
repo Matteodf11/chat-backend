@@ -34,6 +34,12 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/me/online")
+    public ResponseEntity<Void> markOnline(Principal principal) {
+        userService.markOnline(principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/me")
     public ResponseEntity<UserProfileResponse> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,

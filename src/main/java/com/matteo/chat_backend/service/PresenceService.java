@@ -30,9 +30,7 @@ public class PresenceService {
                 .computeIfAbsent(email, ignored -> new AtomicInteger(0))
                 .incrementAndGet();
 
-        if (openSessions == 1) {
-            setOnlineStatus(email, true);
-        }
+        setOnlineStatus(email, true);
     }
 
     public void disconnect(String sessionId) {
@@ -52,6 +50,13 @@ public class PresenceService {
         sessionEmails.entrySet().removeIf(entry -> email.equals(entry.getValue()));
         openSessionsByEmail.remove(email);
         setOnlineStatus(email, false);
+    }
+
+    public void markOnline(String email) {
+        if (email == null) return;
+
+        openSessionsByEmail.computeIfAbsent(email, ignored -> new AtomicInteger(0));
+        setOnlineStatus(email, true);
     }
 
     public boolean isOnline(User user) {
