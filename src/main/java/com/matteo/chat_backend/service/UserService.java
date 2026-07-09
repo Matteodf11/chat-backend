@@ -14,6 +14,7 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PresenceService presenceService;
 
     public UserProfileResponse getMyProfile(String email) {
         User user = userRepository.findByEmail(email)
@@ -64,7 +65,7 @@ public class UserService {
                 user.getEmail(),
                 user.getAvatarUrl(),
                 user.getStatus(),
-                user.getIsOnline(),
+                presenceService.isOnline(user),
                 user.getLastSeen(),
                 user.getCreatedAt()
         );

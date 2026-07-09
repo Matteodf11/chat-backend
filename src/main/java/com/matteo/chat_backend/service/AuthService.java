@@ -52,7 +52,6 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        user.setIsOnline(true);
         user.setLastSeen(LocalDateTime.now());
         userRepository.save(user);
 

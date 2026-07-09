@@ -19,6 +19,7 @@ public class ServerService {
     private final ServerMemberRepository serverMemberRepository;
     private final ChannelRepository channelRepository;
     private final UserRepository userRepository;
+    private final PresenceService presenceService;
 
     public ServerResponse createServer(CreateServerRequest request, String email) {
         User owner = userRepository.findByEmail(email)
@@ -141,7 +142,7 @@ public class ServerService {
                 member.getUser().getUsername(),
                 member.getUser().getAvatarUrl(),
                 member.getRole(),
-                member.getUser().getIsOnline(),
+                presenceService.isOnline(member.getUser()),
                 member.getJoinedAt()
         );
     }

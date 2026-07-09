@@ -26,6 +26,7 @@ public class FriendshipService {
     private final UserRepository userRepository;
     private final DirectMessageRepository directMessageRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final PresenceService presenceService;
 
     public FriendshipResponse sendRequest(UUID receiverId, String requesterEmail) {
         User requester = userRepository.findByEmail(requesterEmail)
@@ -145,7 +146,7 @@ public class FriendshipService {
                 friend.getId(),
                 friend.getUsername(),
                 friend.getAvatarUrl(),
-                friend.getIsOnline(),
+                presenceService.isOnline(friend),
                 f.getStatus(),
                 isIncoming,
                 f.getCreatedAt()
@@ -160,7 +161,7 @@ public class FriendshipService {
                 other.getId(),
                 other.getUsername(),
                 other.getAvatarUrl(),
-                other.getIsOnline(),
+                presenceService.isOnline(other),
                 dm.getCreatedAt()
         );
     }
