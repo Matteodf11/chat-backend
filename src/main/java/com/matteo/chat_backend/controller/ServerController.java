@@ -42,6 +42,14 @@ public class ServerController {
         return ResponseEntity.ok(serverService.getServer(serverId));
     }
 
+    @PutMapping("/{serverId}")
+    public ResponseEntity<ServerResponse> updateServer(
+            @PathVariable UUID serverId,
+            @Valid @RequestBody UpdateServerRequest request,
+            Principal principal) {
+        return ResponseEntity.ok(serverService.updateServer(serverId, request, principal.getName()));
+    }
+
     @PostMapping("/{serverId}/channels")
     public ResponseEntity<ChannelResponse> createChannel(
             @PathVariable UUID serverId,

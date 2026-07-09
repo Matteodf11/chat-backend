@@ -83,6 +83,30 @@ public class ServerService {
         return toResponse(server);
     }
 
+    public ServerResponse updateServer(UUID serverId, UpdateServerRequest request, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+
+        if (!server.getOwner().getId().equals(user.getId())) {
+            throw new RuntimeException("Solo el dueno puede editar este servidor");
+        }
+
+        if (request.getName() != null && !request.getName().isBlank()) {
+            server.setName(request.getName());
+        }
+        if (request.getDescription() != null) {
+            server.setDescription(request.getDescription());
+        }
+        if (request.getIconUrl() != null) {
+            server.setIconUrl(request.getIconUrl());
+        }
+
+        serverRepository.save(server);
+        return toResponse(server);
+    }
+
     public ChannelResponse createChannel(UUID serverId, CreateChannelRequest request, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
