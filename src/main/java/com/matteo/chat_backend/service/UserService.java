@@ -6,6 +6,7 @@ import com.matteo.chat_backend.entity.User;
 import com.matteo.chat_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
@@ -15,6 +16,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PresenceService presenceService;
+    private final AvatarStorageService avatarStorageService;
 
     public UserProfileResponse getMyProfile(String email) {
         User user = userRepository.findByEmail(email)
@@ -54,6 +56,15 @@ public class UserService {
             user.setStatus(request.getStatus());
         }
 
+        userRepository.save(user);
+        return toResponse(user);
+    }
+
+    public UserProfileResponse uploadAvatar(MultipartFile file, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        String avatarUrl = avatarStorageService.uploadAvatar(user, file);
+        user.setAvatarUrl(avatarUrl);
         userRepository.save(user);
         return toResponse(user);
     }

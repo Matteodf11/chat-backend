@@ -1,8 +1,17 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
   application:
     name: chat-backend
   profiles:
     default: local
+supabase:
+  url: ${SUPABASE_URL:}
+  service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+  storage:
+    avatar-bucket: ${SUPABASE_AVATAR_BUCKET:avatars}
 
 management:
   endpoints:
