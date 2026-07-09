@@ -61,6 +61,7 @@ public class MessageService {
         return new MessageResponse(
                 message.getId(),
                 message.getContent(),
+                message.getSender().getId(),
                 message.getSender().getUsername(),
                 message.getSender().getAvatarUrl(),
                 message.getChannel() != null ? message.getChannel().getId() : null,

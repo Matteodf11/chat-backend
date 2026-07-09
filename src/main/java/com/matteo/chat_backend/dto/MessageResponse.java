@@ -10,6 +10,7 @@ import java.util.UUID;
 public class MessageResponse {
     private UUID id;
     private String content;
+    private UUID senderId;
     private String senderUsername;
     private String senderAvatar;
     private UUID channelId;

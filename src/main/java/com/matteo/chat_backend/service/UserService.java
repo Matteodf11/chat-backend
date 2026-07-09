@@ -1,10 +1,12 @@
 package com.matteo.chat_backend.service;
 
+import com.matteo.chat_backend.dto.ProfileEvent;
 import com.matteo.chat_backend.dto.UpdateProfileRequest;
 import com.matteo.chat_backend.dto.UserProfileResponse;
 import com.matteo.chat_backend.entity.User;
 import com.matteo.chat_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,6 +19,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PresenceService presenceService;
     private final AvatarStorageService avatarStorageService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public UserProfileResponse getMyProfile(String email) {
         User user = userRepository.findByEmail(email)
@@ -56,8 +59,9 @@ public class UserService {
             user.setStatus(request.getStatus());
         }
 
-        userRepository.save(user);
-        return toResponse(user);
+        User saved = userRepository.save(user);
+        publishProfileEvent(saved);
+        return toResponse(saved);
     }
 
     public UserProfileResponse uploadAvatar(MultipartFile file, String email) {
@@ -65,8 +69,9 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         String avatarUrl = avatarStorageService.uploadAvatar(user, file);
         user.setAvatarUrl(avatarUrl);
-        userRepository.save(user);
-        return toResponse(user);
+        User saved = userRepository.save(user);
+        publishProfileEvent(saved);
+        return toResponse(saved);
     }
 
     public UserProfileResponse uploadAvatar(byte[] bytes, String contentType, String email) {
@@ -74,8 +79,9 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         String avatarUrl = avatarStorageService.uploadAvatar(user, bytes, contentType);
         user.setAvatarUrl(avatarUrl);
-        userRepository.save(user);
-        return toResponse(user);
+        User saved = userRepository.save(user);
+        publishProfileEvent(saved);
+        return toResponse(saved);
     }
 
     public AvatarStorageService.AvatarFile getAvatar(UUID userId, String fileName) {
@@ -95,6 +101,13 @@ public class UserService {
                 presenceService.isOnline(user),
                 user.getLastSeen(),
                 user.getCreatedAt()
+        );
+    }
+
+    private void publishProfileEvent(User user) {
+        messagingTemplate.convertAndSend(
+                "/topic/profile",
+                new ProfileEvent(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getStatus())
         );
     }
 }
