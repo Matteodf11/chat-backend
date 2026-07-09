@@ -4,6 +4,7 @@ import com.matteo.chat_backend.dto.MessageRequest;
 import com.matteo.chat_backend.dto.MessageResponse;
 import com.matteo.chat_backend.service.MessageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class MessageController {
 
     private final MessageService messageService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @GetMapping("/channel/{channelId}")
     public ResponseEntity<List<MessageResponse>> getChannelMessages(@PathVariable UUID channelId) {
@@ -27,9 +29,11 @@ public class MessageController {
     public ResponseEntity<MessageResponse> sendMessage(
             @PathVariable UUID channelId,
             @RequestBody MessageRequest request,
-            Principal principal) {
+        Principal principal) {
         request.setChannelId(channelId);
-        return ResponseEntity.ok(messageService.saveMessage(request, principal.getName()));
+        MessageResponse response = messageService.saveMessage(request, principal.getName());
+        messagingTemplate.convertAndSend("/topic/channel." + channelId, response);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/dm/{dmId}")
@@ -41,8 +45,10 @@ public class MessageController {
     public ResponseEntity<MessageResponse> sendDmMessage(
             @PathVariable UUID dmId,
             @RequestBody MessageRequest request,
-            Principal principal) {
+        Principal principal) {
         request.setDmId(dmId);
-        return ResponseEntity.ok(messageService.saveMessage(request, principal.getName()));
+        MessageResponse response = messageService.saveMessage(request, principal.getName());
+        messagingTemplate.convertAndSend("/topic/dm." + dmId, response);
+        return ResponseEntity.ok(response);
     }
 }

@@ -28,7 +28,7 @@ public class ChatController {
             );
         } else if (request.getDmId() != null) {
             messagingTemplate.convertAndSend(
-                    "/queue/dm." + request.getDmId(), response
+                    "/topic/dm." + request.getDmId(), response
             );
         }
     }

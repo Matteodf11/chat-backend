@@ -1,6 +1,7 @@
 package com.matteo.chat_backend.service;
 
 import com.matteo.chat_backend.dto.DmResponse;
+import com.matteo.chat_backend.dto.FriendshipEvent;
 import com.matteo.chat_backend.dto.FriendshipResponse;
 import com.matteo.chat_backend.entity.DirectMessage;
 import com.matteo.chat_backend.entity.Friendship;
@@ -9,6 +10,7 @@ import com.matteo.chat_backend.repository.DirectMessageRepository;
 import com.matteo.chat_backend.repository.FriendshipRepository;
 import com.matteo.chat_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -23,6 +25,7 @@ public class FriendshipService {
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
     private final DirectMessageRepository directMessageRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public FriendshipResponse sendRequest(UUID receiverId, String requesterEmail) {
         User requester = userRepository.findByEmail(requesterEmail)
@@ -45,6 +48,7 @@ public class FriendshipService {
         friendship.setCreatedAt(LocalDateTime.now());
         friendshipRepository.save(friendship);
 
+        publishFriendshipEvent("friend_request_created", friendship, requester, receiver);
         return toResponse(friendship, requester);
     }
 
@@ -61,6 +65,7 @@ public class FriendshipService {
         friendship.setStatus("accepted");
         friendshipRepository.save(friendship);
 
+        publishFriendshipEvent("friend_request_accepted", friendship, friendship.getRequester(), friendship.getReceiver());
         return toResponse(friendship, user);
     }
 
@@ -77,6 +82,7 @@ public class FriendshipService {
         friendship.setStatus("rejected");
         friendshipRepository.save(friendship);
 
+        publishFriendshipEvent("friend_request_rejected", friendship, friendship.getRequester(), friendship.getReceiver());
         return toResponse(friendship, user);
     }
 
@@ -156,6 +162,19 @@ public class FriendshipService {
                 other.getAvatarUrl(),
                 other.getIsOnline(),
                 dm.getCreatedAt()
+        );
+    }
+
+    private void publishFriendshipEvent(String type, Friendship friendship, User requester, User receiver) {
+        messagingTemplate.convertAndSendToUser(
+                requester.getEmail(),
+                "/queue/friends",
+                new FriendshipEvent(type, toResponse(friendship, requester))
+        );
+        messagingTemplate.convertAndSendToUser(
+                receiver.getEmail(),
+                "/queue/friends",
+                new FriendshipEvent(type, toResponse(friendship, receiver))
         );
     }
 }
