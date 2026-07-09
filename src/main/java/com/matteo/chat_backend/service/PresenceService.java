@@ -46,6 +46,14 @@ public class PresenceService {
         }
     }
 
+    public void disconnectAll(String email) {
+        if (email == null) return;
+
+        sessionEmails.entrySet().removeIf(entry -> email.equals(entry.getValue()));
+        openSessionsByEmail.remove(email);
+        setOnlineStatus(email, false);
+    }
+
     public boolean isOnline(User user) {
         return user != null && isOnline(user.getEmail());
     }

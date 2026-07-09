@@ -28,6 +28,12 @@ public class UserController {
         return ResponseEntity.ok(userService.getMyProfile(principal.getName()));
     }
 
+    @PostMapping("/me/offline")
+    public ResponseEntity<Void> markOffline(Principal principal) {
+        userService.markOffline(principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/me")
     public ResponseEntity<UserProfileResponse> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,

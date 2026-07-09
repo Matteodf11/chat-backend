@@ -91,6 +91,10 @@ public class UserService {
         return avatarStorageService.downloadAvatar(userId, fileName);
     }
 
+    public void markOffline(String email) {
+        presenceService.disconnectAll(email);
+    }
+
     private UserProfileResponse toResponse(User user) {
         return new UserProfileResponse(
                 user.getId(),
