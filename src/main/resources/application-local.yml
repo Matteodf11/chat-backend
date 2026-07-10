@@ -3,11 +3,12 @@ server:
 
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/chat_mattu}
-    username: ${DB_USERNAME:chat_mattu}
-    password: ${DB_PASSWORD:chat_mattu}
+    url: ${DB_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chat_mattu}}
+    username: ${DB_USERNAME:${SPRING_DATASOURCE_USERNAME:chat_mattu}}
+    password: ${DB_PASSWORD:${SPRING_DATASOURCE_PASSWORD:chat_mattu}}
   flyway:
     enabled: true
+    baseline-on-migrate: true
     locations: classpath:db/migration/common,classpath:db/migration/{vendor}
   jpa:
     hibernate:
