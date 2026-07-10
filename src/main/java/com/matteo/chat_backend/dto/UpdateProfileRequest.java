@@ -11,6 +11,8 @@ public class UpdateProfileRequest {
 
     private String avatarUrl;
 
+    private String profileBannerUrl;
+
     @Size(max = 100)
     private String status;
 

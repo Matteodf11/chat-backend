@@ -55,6 +55,10 @@ public class UserService {
             user.setAvatarUrl(request.getAvatarUrl());
         }
 
+        if (request.getProfileBannerUrl() != null) {
+            user.setProfileBannerUrl(request.getProfileBannerUrl());
+        }
+
         if (request.getStatus() != null) {
             user.setStatus(request.getStatus());
         }
@@ -88,11 +92,38 @@ public class UserService {
         return toResponse(saved);
     }
 
+    public UserProfileResponse uploadBanner(MultipartFile file, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        String bannerUrl = avatarStorageService.uploadBanner(user, file);
+        user.setProfileBannerUrl(bannerUrl);
+        User saved = userRepository.save(user);
+        publishProfileEvent(saved);
+        return toResponse(saved);
+    }
+
+    public UserProfileResponse uploadBanner(byte[] bytes, String contentType, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        String bannerUrl = avatarStorageService.uploadBanner(user, bytes, contentType);
+        user.setProfileBannerUrl(bannerUrl);
+        User saved = userRepository.save(user);
+        publishProfileEvent(saved);
+        return toResponse(saved);
+    }
+
     public AvatarStorageService.AvatarFile getAvatar(UUID userId, String fileName) {
         if (!userRepository.existsById(userId)) {
             throw new RuntimeException("Usuario no encontrado");
         }
         return avatarStorageService.downloadAvatar(userId, fileName);
+    }
+
+    public AvatarStorageService.AvatarFile getBanner(UUID userId, String fileName) {
+        if (!userRepository.existsById(userId)) {
+            throw new RuntimeException("Usuario no encontrado");
+        }
+        return avatarStorageService.downloadBanner(userId, fileName);
     }
 
     public void markOffline(String email) {
@@ -109,6 +140,7 @@ public class UserService {
                 user.getUsername(),
                 user.getEmail(),
                 user.getAvatarUrl(),
+                user.getProfileBannerUrl(),
                 user.getStatus(),
                 user.getProfileColor(),
                 presenceService.isOnline(user),
@@ -120,7 +152,7 @@ public class UserService {
     private void publishProfileEvent(User user) {
         messagingTemplate.convertAndSend(
                 "/topic/profile",
-                new ProfileEvent(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getStatus(), user.getProfileColor())
+                new ProfileEvent(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getProfileBannerUrl(), user.getStatus(), user.getProfileColor())
         );
     }
 }

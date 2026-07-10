@@ -54,12 +54,34 @@ public class AvatarStorageService {
     }
 
     public String uploadAvatar(User user, byte[] bytes, String contentType) {
+        return uploadProfileImage(user, bytes, contentType, "avatar");
+    }
+
+    public String uploadBanner(User user, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("Selecciona una imagen");
+        }
+
+        try {
+            return uploadBanner(user, file.getBytes(), file.getContentType());
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("No se pudo leer el banner seleccionado: " + e.getMessage(), e);
+        }
+    }
+
+    public String uploadBanner(User user, byte[] bytes, String contentType) {
+        return uploadProfileImage(user, bytes, contentType, "banner");
+    }
+
+    private String uploadProfileImage(User user, byte[] bytes, String contentType, String imageName) {
         validateFile(bytes, contentType);
         validateConfiguration();
 
         try {
             String extension = extensionFor(contentType);
-            String objectPath = "users/" + user.getId() + "/avatar." + extension;
+            String objectPath = "users/" + user.getId() + "/" + imageName + "." + extension;
             String encodedPath = encodeObjectPath(objectPath);
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -73,23 +95,31 @@ public class AvatarStorageService {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("Supabase no acepto el avatar: " + response.body());
+                throw new RuntimeException("Supabase no acepto la imagen: " + response.body());
             }
 
-            return "/api/users/" + user.getId() + "/avatar/avatar." + extension + "?v=" + System.currentTimeMillis();
+            return "/api/users/" + user.getId() + "/" + imageName + "/" + imageName + "." + extension + "?v=" + System.currentTimeMillis();
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException("No se pudo subir el avatar: " + e.getMessage(), e);
+            throw new RuntimeException("No se pudo subir la imagen: " + e.getMessage(), e);
         }
     }
 
     public AvatarFile downloadAvatar(UUID userId, String fileName) {
+        return downloadProfileImage(userId, fileName, "avatar");
+    }
+
+    public AvatarFile downloadBanner(UUID userId, String fileName) {
+        return downloadProfileImage(userId, fileName, "banner");
+    }
+
+    private AvatarFile downloadProfileImage(UUID userId, String fileName, String imageName) {
         validateConfiguration();
 
         try {
             String extension = extensionFromFileName(fileName);
-            String objectPath = "users/" + userId + "/avatar." + extension;
+            String objectPath = "users/" + userId + "/" + imageName + "." + extension;
             String encodedPath = encodeObjectPath(objectPath);
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -101,14 +131,14 @@ public class AvatarStorageService {
 
             HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("Avatar no encontrado");
+                throw new RuntimeException("Imagen no encontrada");
             }
 
             return new AvatarFile(response.body(), contentTypeFor(extension));
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException("No se pudo leer el avatar: " + e.getMessage(), e);
+            throw new RuntimeException("No se pudo leer la imagen: " + e.getMessage(), e);
         }
     }
 

@@ -30,6 +30,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/ws/**", "/ws-native/**").permitAll()
                         .requestMatchers("/api/users/*/avatar/**").permitAll()
+                        .requestMatchers("/api/users/*/banner/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

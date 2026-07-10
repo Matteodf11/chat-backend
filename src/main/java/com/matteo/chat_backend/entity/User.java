@@ -26,6 +26,9 @@ public class User {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
+    @Column(name = "profile_banner_url")
+    private String profileBannerUrl;
+
     private String status;
 
     @Column(name = "profile_color", length = 20)

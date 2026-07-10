@@ -12,6 +12,7 @@ public class UserProfileResponse {
     private String username;
     private String email;
     private String avatarUrl;
+    private String profileBannerUrl;
     private String status;
     private String profileColor;
     private Boolean isOnline;

@@ -65,6 +65,24 @@ public class UserController {
         return ResponseEntity.ok(userService.uploadAvatar(bytes, contentType, principal.getName()));
     }
 
+    @PostMapping(value = "/me/banner", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<UserProfileResponse> uploadBanner(
+            @RequestParam("file") MultipartFile file,
+            Principal principal) {
+        return ResponseEntity.ok(userService.uploadBanner(file, principal.getName()));
+    }
+
+    @PostMapping(
+            value = "/me/banner",
+            consumes = {MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE, "image/webp"}
+    )
+    public ResponseEntity<UserProfileResponse> uploadBannerBytes(
+            @RequestBody byte[] bytes,
+            @RequestHeader("Content-Type") String contentType,
+            Principal principal) {
+        return ResponseEntity.ok(userService.uploadBanner(bytes, contentType, principal.getName()));
+    }
+
     @GetMapping("/{userId}/avatar/{fileName}")
     public ResponseEntity<byte[]> getAvatar(
             @PathVariable UUID userId,
@@ -74,6 +92,17 @@ public class UserController {
                 .contentType(MediaType.parseMediaType(avatar.contentType()))
                 .cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic())
                 .body(avatar.bytes());
+    }
+
+    @GetMapping("/{userId}/banner/{fileName}")
+    public ResponseEntity<byte[]> getBanner(
+            @PathVariable UUID userId,
+            @PathVariable String fileName) {
+        AvatarStorageService.AvatarFile banner = userService.getBanner(userId, fileName);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(banner.contentType()))
+                .cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic())
+                .body(banner.bytes());
     }
 
     @GetMapping("/{userId}")
