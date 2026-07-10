@@ -13,5 +13,6 @@ public class ServerResponse {
     private String description;
     private String iconUrl;
     private String ownerUsername;
+    private String myRole;
     private LocalDateTime createdAt;
 }

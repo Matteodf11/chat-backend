@@ -7,4 +7,5 @@ import java.util.UUID;
 
 public interface ChannelRepository extends JpaRepository<Channel, UUID> {
     List<Channel> findByServerId(UUID serverId);
+    void deleteByServerId(UUID serverId);
 }

@@ -38,8 +38,10 @@ public class ServerController {
     }
 
     @GetMapping("/{serverId}")
-    public ResponseEntity<ServerResponse> getServer(@PathVariable UUID serverId) {
-        return ResponseEntity.ok(serverService.getServer(serverId));
+    public ResponseEntity<ServerResponse> getServer(
+            @PathVariable UUID serverId,
+            Principal principal) {
+        return ResponseEntity.ok(serverService.getServer(serverId, principal.getName()));
     }
 
     @PutMapping("/{serverId}")
@@ -59,12 +61,40 @@ public class ServerController {
     }
 
     @GetMapping("/{serverId}/channels")
-    public ResponseEntity<List<ChannelResponse>> getChannels(@PathVariable UUID serverId) {
-        return ResponseEntity.ok(serverService.getServerChannels(serverId));
+    public ResponseEntity<List<ChannelResponse>> getChannels(
+            @PathVariable UUID serverId,
+            Principal principal) {
+        return ResponseEntity.ok(serverService.getServerChannels(serverId, principal.getName()));
     }
 
     @GetMapping("/{serverId}/members")
-    public ResponseEntity<List<ServerMemberResponse>> getMembers(@PathVariable UUID serverId) {
-        return ResponseEntity.ok(serverService.getServerMembers(serverId));
+    public ResponseEntity<List<ServerMemberResponse>> getMembers(
+            @PathVariable UUID serverId,
+            Principal principal) {
+        return ResponseEntity.ok(serverService.getServerMembers(serverId, principal.getName()));
+    }
+
+    @PostMapping("/{serverId}/members")
+    public ResponseEntity<ServerMemberResponse> inviteMember(
+            @PathVariable UUID serverId,
+            @Valid @RequestBody InviteServerMemberRequest request,
+            Principal principal) {
+        return ResponseEntity.ok(serverService.inviteMember(serverId, request, principal.getName()));
+    }
+
+    @DeleteMapping("/{serverId}/leave")
+    public ResponseEntity<Void> leaveServer(
+            @PathVariable UUID serverId,
+            Principal principal) {
+        serverService.leaveServer(serverId, principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{serverId}")
+    public ResponseEntity<Void> deleteServer(
+            @PathVariable UUID serverId,
+            Principal principal) {
+        serverService.deleteServer(serverId, principal.getName());
+        return ResponseEntity.noContent().build();
     }
 }
