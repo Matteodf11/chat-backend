@@ -28,6 +28,9 @@ public class User {
 
     private String status;
 
+    @Column(name = "profile_color", length = 20)
+    private String profileColor = "#7C5CFF";
+
     @Column(name = "is_online")
     private Boolean isOnline = false;
 

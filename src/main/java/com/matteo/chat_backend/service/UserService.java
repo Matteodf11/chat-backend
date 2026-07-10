@@ -59,6 +59,10 @@ public class UserService {
             user.setStatus(request.getStatus());
         }
 
+        if (request.getProfileColor() != null && !request.getProfileColor().isBlank()) {
+            user.setProfileColor(request.getProfileColor());
+        }
+
         User saved = userRepository.save(user);
         publishProfileEvent(saved);
         return toResponse(saved);
@@ -106,6 +110,7 @@ public class UserService {
                 user.getEmail(),
                 user.getAvatarUrl(),
                 user.getStatus(),
+                user.getProfileColor(),
                 presenceService.isOnline(user),
                 user.getLastSeen(),
                 user.getCreatedAt()
@@ -115,7 +120,7 @@ public class UserService {
     private void publishProfileEvent(User user) {
         messagingTemplate.convertAndSend(
                 "/topic/profile",
-                new ProfileEvent(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getStatus())
+                new ProfileEvent(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getStatus(), user.getProfileColor())
         );
     }
 }

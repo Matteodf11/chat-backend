@@ -12,4 +12,5 @@ public class ProfileEvent {
     private String username;
     private String avatarUrl;
     private String status;
+    private String profileColor;
 }

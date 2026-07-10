@@ -13,4 +13,7 @@ public class UpdateProfileRequest {
 
     @Size(max = 100)
     private String status;
+
+    @Size(max = 20)
+    private String profileColor;
 }

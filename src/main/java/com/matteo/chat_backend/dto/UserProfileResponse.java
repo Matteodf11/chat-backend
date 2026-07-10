@@ -13,6 +13,7 @@ public class UserProfileResponse {
     private String email;
     private String avatarUrl;
     private String status;
+    private String profileColor;
     private Boolean isOnline;
     private LocalDateTime lastSeen;
     private LocalDateTime createdAt;
