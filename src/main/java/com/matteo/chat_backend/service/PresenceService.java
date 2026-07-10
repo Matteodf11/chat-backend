@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -21,6 +22,7 @@ public class PresenceService {
     private final SimpMessagingTemplate messagingTemplate;
     private final Map<String, String> sessionEmails = new ConcurrentHashMap<>();
     private final Map<String, AtomicInteger> openSessionsByEmail = new ConcurrentHashMap<>();
+    private final Set<String> provisionalOnlineEmails = ConcurrentHashMap.newKeySet();
 
     public void connect(String sessionId, String email) {
         if (sessionId == null || email == null) return;
@@ -38,8 +40,10 @@ public class PresenceService {
         if (email == null) return;
 
         AtomicInteger openSessions = openSessionsByEmail.get(email);
-        if (openSessions != null && openSessions.decrementAndGet() <= 0) {
+        int offlineThreshold = provisionalOnlineEmails.contains(email) ? 1 : 0;
+        if (openSessions != null && openSessions.decrementAndGet() <= offlineThreshold) {
             openSessionsByEmail.remove(email);
+            provisionalOnlineEmails.remove(email);
             setOnlineStatus(email, false);
         }
     }
@@ -49,13 +53,15 @@ public class PresenceService {
 
         sessionEmails.entrySet().removeIf(entry -> email.equals(entry.getValue()));
         openSessionsByEmail.remove(email);
+        provisionalOnlineEmails.remove(email);
         setOnlineStatus(email, false);
     }
 
     public void markOnline(String email) {
         if (email == null) return;
 
-        openSessionsByEmail.computeIfAbsent(email, ignored -> new AtomicInteger(0));
+        provisionalOnlineEmails.add(email);
+        openSessionsByEmail.computeIfAbsent(email, ignored -> new AtomicInteger(1));
         setOnlineStatus(email, true);
     }
 
