@@ -75,4 +75,14 @@ public class MessageService {
         return messageRepository.findByDirectMessageIdOrderByCreatedAtAsc(dmId, Pageable.unpaged())
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
+
+    public DirectMessage getDirectMessage(UUID dmId) {
+        return directMessageRepository.findById(dmId)
+                .orElseThrow(() -> new RuntimeException("Conversacion no encontrada"));
+    }
+
+    public User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+    }
 }

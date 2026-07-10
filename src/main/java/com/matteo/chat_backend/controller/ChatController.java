@@ -2,6 +2,10 @@ package com.matteo.chat_backend.controller;
 
 import com.matteo.chat_backend.dto.MessageRequest;
 import com.matteo.chat_backend.dto.MessageResponse;
+import com.matteo.chat_backend.dto.TypingEvent;
+import com.matteo.chat_backend.dto.TypingRequest;
+import com.matteo.chat_backend.entity.DirectMessage;
+import com.matteo.chat_backend.entity.User;
 import com.matteo.chat_backend.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -30,6 +34,31 @@ public class ChatController {
             messagingTemplate.convertAndSend(
                     "/topic/dm." + request.getDmId(), response
             );
+            publishDmPersonalMessage(request.getDmId(), response);
         }
+    }
+
+    @MessageMapping("/chat.typing")
+    public void typing(@Payload TypingRequest request, Principal principal) {
+        User sender = messageService.getUserByEmail(principal.getName());
+        TypingEvent event = new TypingEvent(
+                sender.getId(),
+                sender.getUsername(),
+                request.getChannelId(),
+                request.getDmId(),
+                Boolean.TRUE.equals(request.getTyping())
+        );
+
+        if (request.getChannelId() != null) {
+            messagingTemplate.convertAndSend("/topic/typing.channel." + request.getChannelId(), event);
+        } else if (request.getDmId() != null) {
+            messagingTemplate.convertAndSend("/topic/typing.dm." + request.getDmId(), event);
+        }
+    }
+
+    private void publishDmPersonalMessage(java.util.UUID dmId, MessageResponse response) {
+        DirectMessage dm = messageService.getDirectMessage(dmId);
+        messagingTemplate.convertAndSendToUser(dm.getUser1().getEmail(), "/queue/messages", response);
+        messagingTemplate.convertAndSendToUser(dm.getUser2().getEmail(), "/queue/messages", response);
     }
 }

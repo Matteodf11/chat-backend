@@ -49,6 +49,9 @@ public class MessageController {
         request.setDmId(dmId);
         MessageResponse response = messageService.saveMessage(request, principal.getName());
         messagingTemplate.convertAndSend("/topic/dm." + dmId, response);
+        var dm = messageService.getDirectMessage(dmId);
+        messagingTemplate.convertAndSendToUser(dm.getUser1().getEmail(), "/queue/messages", response);
+        messagingTemplate.convertAndSendToUser(dm.getUser2().getEmail(), "/queue/messages", response);
         return ResponseEntity.ok(response);
     }
 }
