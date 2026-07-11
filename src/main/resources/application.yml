@@ -7,6 +7,9 @@ spring:
     name: chat-backend
   profiles:
     default: local
+security:
+  message-encryption-key: ${MESSAGE_ENCRYPTION_KEY:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+
 supabase:
   url: ${SUPABASE_URL:}
   service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}

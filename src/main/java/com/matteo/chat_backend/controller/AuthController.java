@@ -5,6 +5,9 @@ import com.matteo.chat_backend.dto.LoginRequest;
 import com.matteo.chat_backend.dto.RegisterRequest;
 import com.matteo.chat_backend.service.AuthService;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
+import com.matteo.chat_backend.service.RequestRateLimiter;
+import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,14 +18,27 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final RequestRateLimiter rateLimiter;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest servletRequest) {
+        rateLimiter.requireCapacity("register:" + clientAddress(servletRequest), 5, Duration.ofHours(1), "Demasiados intentos de registro");
         return ResponseEntity.ok(authService.register(request));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+        String address = clientAddress(servletRequest);
+        rateLimiter.requireCapacity("login-ip:" + address, 30, Duration.ofMinutes(15), "Demasiados intentos de inicio de sesion");
+        rateLimiter.requireCapacity("login-account:" + request.getEmail().toLowerCase(), 10, Duration.ofMinutes(15), "Demasiados intentos para esta cuenta");
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    private String clientAddress(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",", 2)[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

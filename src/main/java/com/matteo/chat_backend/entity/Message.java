@@ -26,7 +26,7 @@ public class Message {
     @JoinColumn(name = "dm_id")
     private DirectMessage directMessage;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     private Boolean edited = false;

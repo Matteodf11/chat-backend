@@ -1,6 +1,9 @@
 server:
   port: ${PORT:8080}
 
+security:
+  message-encryption-key: ${MESSAGE_ENCRYPTION_KEY}
+
 spring:
   datasource:
     url: ${DB_URL:${SPRING_DATASOURCE_URL}}

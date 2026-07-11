@@ -14,9 +14,10 @@ public class RegisterRequest {
 
     @NotBlank(message = "El email es obligatorio")
     @Email(message = "El email no tiene formato válido")
+    @Size(max = 254, message = "El email es demasiado largo")
     private String email;
 
     @NotBlank(message = "La contraseña es obligatoria")
-    @Size(min = 6, message = "La contraseña debe tener al menos 6 caracteres")
+    @Size(min = 10, max = 72, message = "La contrasena debe tener entre 10 y 72 caracteres")
     private String password;
 }
