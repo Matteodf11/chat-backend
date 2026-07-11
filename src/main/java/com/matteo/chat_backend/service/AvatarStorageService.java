@@ -1,6 +1,7 @@
 package com.matteo.chat_backend.service;
 
 import com.matteo.chat_backend.entity.User;
+import com.matteo.chat_backend.entity.Server;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -75,6 +76,16 @@ public class AvatarStorageService {
         return uploadProfileImage(user, bytes, contentType, "banner");
     }
 
+    public String uploadServerIcon(Server server, byte[] bytes, String contentType) {
+        validateFile(bytes, contentType);
+        validateConfiguration();
+
+        String extension = extensionFor(contentType);
+        String objectPath = "servers/" + server.getId() + "/icon." + extension;
+        uploadObject(objectPath, bytes, contentType);
+        return "/api/servers/" + server.getId() + "/icon/icon." + extension + "?v=" + System.currentTimeMillis();
+    }
+
     private String uploadProfileImage(User user, byte[] bytes, String contentType, String imageName) {
         validateFile(bytes, contentType);
         validateConfiguration();
@@ -84,19 +95,7 @@ public class AvatarStorageService {
             String objectPath = "users/" + user.getId() + "/" + imageName + "." + extension;
             String encodedPath = encodeObjectPath(objectPath);
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(normalizedSupabaseUrl() + "/storage/v1/object/" + avatarBucket + "/" + encodedPath))
-                    .header("Authorization", "Bearer " + serviceRoleKey)
-                    .header("apikey", serviceRoleKey)
-                    .header("Content-Type", contentType)
-                    .header("x-upsert", "true")
-                    .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("Supabase no acepto la imagen: " + response.body());
-            }
+            uploadObject(objectPath, bytes, contentType);
 
             return "/api/users/" + user.getId() + "/" + imageName + "/" + imageName + "." + extension + "?v=" + System.currentTimeMillis();
         } catch (RuntimeException e) {
@@ -114,26 +113,59 @@ public class AvatarStorageService {
         return downloadProfileImage(userId, fileName, "banner");
     }
 
+    public AvatarFile downloadServerIcon(UUID serverId, String fileName) {
+        String extension = extensionFromFileName(fileName);
+        return downloadObject("servers/" + serverId + "/icon." + extension, extension);
+    }
+
     private AvatarFile downloadProfileImage(UUID userId, String fileName, String imageName) {
         validateConfiguration();
 
         try {
             String extension = extensionFromFileName(fileName);
             String objectPath = "users/" + userId + "/" + imageName + "." + extension;
-            String encodedPath = encodeObjectPath(objectPath);
+            return downloadObject(objectPath, extension);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("No se pudo leer la imagen: " + e.getMessage(), e);
+        }
+    }
 
+    private void uploadObject(String objectPath, byte[] bytes, String contentType) {
+        try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(normalizedSupabaseUrl() + "/storage/v1/object/" + avatarBucket + "/" + encodedPath))
+                    .uri(URI.create(normalizedSupabaseUrl() + "/storage/v1/object/" + avatarBucket + "/" + encodeObjectPath(objectPath)))
+                    .header("Authorization", "Bearer " + serviceRoleKey)
+                    .header("apikey", serviceRoleKey)
+                    .header("Content-Type", contentType)
+                    .header("x-upsert", "true")
+                    .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new RuntimeException("Supabase no acepto la imagen: " + response.body());
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("No se pudo subir la imagen: " + e.getMessage(), e);
+        }
+    }
+
+    private AvatarFile downloadObject(String objectPath, String extension) {
+        validateConfiguration();
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(normalizedSupabaseUrl() + "/storage/v1/object/" + avatarBucket + "/" + encodeObjectPath(objectPath)))
                     .header("Authorization", "Bearer " + serviceRoleKey)
                     .header("apikey", serviceRoleKey)
                     .GET()
                     .build();
-
             HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new RuntimeException("Imagen no encontrada");
             }
-
             return new AvatarFile(response.body(), contentTypeFor(extension));
         } catch (RuntimeException e) {
             throw e;

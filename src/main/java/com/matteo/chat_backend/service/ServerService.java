@@ -39,6 +39,7 @@ public class ServerService {
     private final PresenceService presenceService;
     private final MessageRepository messageRepository;
     private final ServerInvitationRepository serverInvitationRepository;
+    private final AvatarStorageService avatarStorageService;
 
     @Transactional
     public ServerResponse createServer(CreateServerRequest request, String email) {
@@ -130,6 +131,22 @@ public class ServerService {
 
         serverRepository.save(server);
         return toResponse(server, member.getRole());
+    }
+
+    @Transactional
+    public ServerResponse uploadServerIcon(UUID serverId, byte[] bytes, String contentType, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+        ServerMember member = requireManager(server, user);
+        server.setIconUrl(avatarStorageService.uploadServerIcon(server, bytes, contentType));
+        serverRepository.save(server);
+        return toResponse(server, member.getRole());
+    }
+
+    public AvatarStorageService.AvatarFile getServerIcon(UUID serverId, String fileName) {
+        return avatarStorageService.downloadServerIcon(serverId, fileName);
     }
 
     @Transactional

@@ -2,14 +2,18 @@ package com.matteo.chat_backend.controller;
 
 import com.matteo.chat_backend.dto.*;
 import com.matteo.chat_backend.service.ServerService;
+import com.matteo.chat_backend.service.AvatarStorageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/servers")
@@ -50,6 +54,29 @@ public class ServerController {
             @Valid @RequestBody UpdateServerRequest request,
             Principal principal) {
         return ResponseEntity.ok(serverService.updateServer(serverId, request, principal.getName()));
+    }
+
+    @PostMapping(
+            value = "/{serverId}/icon",
+            consumes = {MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE, "image/webp"}
+    )
+    public ResponseEntity<ServerResponse> uploadServerIcon(
+            @PathVariable UUID serverId,
+            @RequestBody byte[] bytes,
+            @RequestHeader("Content-Type") String contentType,
+            Principal principal) {
+        return ResponseEntity.ok(serverService.uploadServerIcon(serverId, bytes, contentType, principal.getName()));
+    }
+
+    @GetMapping("/{serverId}/icon/{fileName}")
+    public ResponseEntity<byte[]> getServerIcon(
+            @PathVariable UUID serverId,
+            @PathVariable String fileName) {
+        AvatarStorageService.AvatarFile icon = serverService.getServerIcon(serverId, fileName);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(icon.contentType()))
+                .cacheControl(CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic())
+                .body(icon.bytes());
     }
 
     @PostMapping("/{serverId}/channels")
