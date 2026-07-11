@@ -4,17 +4,20 @@ import com.matteo.chat_backend.dto.ChannelResponse;
 import com.matteo.chat_backend.dto.CreateChannelRequest;
 import com.matteo.chat_backend.dto.CreateServerRequest;
 import com.matteo.chat_backend.dto.InviteServerMemberRequest;
+import com.matteo.chat_backend.dto.ServerInvitationResponse;
 import com.matteo.chat_backend.dto.ServerMemberResponse;
 import com.matteo.chat_backend.dto.ServerResponse;
 import com.matteo.chat_backend.dto.UpdateServerRequest;
 import com.matteo.chat_backend.entity.Channel;
 import com.matteo.chat_backend.entity.Server;
+import com.matteo.chat_backend.entity.ServerInvitation;
 import com.matteo.chat_backend.entity.ServerMember;
 import com.matteo.chat_backend.entity.User;
 import com.matteo.chat_backend.repository.ChannelRepository;
 import com.matteo.chat_backend.repository.MessageRepository;
 import com.matteo.chat_backend.repository.ServerMemberRepository;
 import com.matteo.chat_backend.repository.ServerRepository;
+import com.matteo.chat_backend.repository.ServerInvitationRepository;
 import com.matteo.chat_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,6 +38,7 @@ public class ServerService {
     private final UserRepository userRepository;
     private final PresenceService presenceService;
     private final MessageRepository messageRepository;
+    private final ServerInvitationRepository serverInvitationRepository;
 
     @Transactional
     public ServerResponse createServer(CreateServerRequest request, String email) {
@@ -168,26 +172,81 @@ public class ServerService {
     }
 
     @Transactional
-    public ServerMemberResponse inviteMember(UUID serverId, InviteServerMemberRequest request, String email) {
+    public ServerInvitationResponse inviteMember(UUID serverId, InviteServerMemberRequest request, String email) {
         User inviter = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         Server server = serverRepository.findById(serverId)
                 .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
         requireManager(server, inviter);
 
-        User invited = userRepository.findByUsername(request.getUsername())
+        User invited = findUserByUsernameOrEmail(request.getUsername())
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        if (invited.getId().equals(inviter.getId())) {
+            throw new RuntimeException("No puedes invitarte a ti mismo");
+        }
         if (serverMemberRepository.existsByServerAndUser(server, invited)) {
             throw new RuntimeException("Ese usuario ya esta en el servidor");
         }
+        if (serverInvitationRepository.findByServerAndInviteeAndStatus(server, invited, "pending").isPresent()) {
+            throw new RuntimeException("Ese usuario ya tiene una invitacion pendiente");
+        }
 
-        ServerMember member = new ServerMember();
-        member.setServer(server);
-        member.setUser(invited);
-        member.setRole("member");
-        member.setJoinedAt(LocalDateTime.now());
-        serverMemberRepository.save(member);
-        return toMemberResponse(member);
+        ServerInvitation invitation = new ServerInvitation();
+        invitation.setServer(server);
+        invitation.setInviter(inviter);
+        invitation.setInvitee(invited);
+        invitation.setStatus("pending");
+        invitation.setCreatedAt(LocalDateTime.now());
+        serverInvitationRepository.save(invitation);
+        return toInvitationResponse(invitation);
+    }
+
+    public List<ServerInvitationResponse> getPendingInvitations(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        return serverInvitationRepository.findByInviteeAndStatusOrderByCreatedAtDesc(user, "pending")
+                .stream().map(this::toInvitationResponse).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public ServerResponse acceptInvitation(UUID invitationId, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        ServerInvitation invitation = serverInvitationRepository.findByIdAndInvitee(invitationId, user)
+                .orElseThrow(() -> new RuntimeException("Invitacion no encontrada"));
+        if (!"pending".equals(invitation.getStatus())) {
+            throw new RuntimeException("La invitacion ya no esta pendiente");
+        }
+
+        Server server = invitation.getServer();
+        if (!serverMemberRepository.existsByServerAndUser(server, user)) {
+            ServerMember member = new ServerMember();
+            member.setServer(server);
+            member.setUser(user);
+            member.setRole("member");
+            member.setJoinedAt(LocalDateTime.now());
+            serverMemberRepository.save(member);
+        }
+
+        invitation.setStatus("accepted");
+        invitation.setRespondedAt(LocalDateTime.now());
+        serverInvitationRepository.save(invitation);
+        return toResponse(server, "member");
+    }
+
+    @Transactional
+    public void rejectInvitation(UUID invitationId, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        ServerInvitation invitation = serverInvitationRepository.findByIdAndInvitee(invitationId, user)
+                .orElseThrow(() -> new RuntimeException("Invitacion no encontrada"));
+        if (!"pending".equals(invitation.getStatus())) {
+            return;
+        }
+
+        invitation.setStatus("rejected");
+        invitation.setRespondedAt(LocalDateTime.now());
+        serverInvitationRepository.save(invitation);
     }
 
     @Transactional
@@ -218,6 +277,7 @@ public class ServerService {
         if (!channelIds.isEmpty()) {
             messageRepository.deleteByChannelIds(channelIds);
         }
+        serverInvitationRepository.deleteByServer(server);
         channelRepository.deleteByServerId(serverId);
         serverMemberRepository.deleteByServer(server);
         serverRepository.delete(server);
@@ -256,6 +316,18 @@ public class ServerService {
         );
     }
 
+    private ServerInvitationResponse toInvitationResponse(ServerInvitation invitation) {
+        return new ServerInvitationResponse(
+                invitation.getId(),
+                invitation.getServer().getId(),
+                invitation.getServer().getName(),
+                invitation.getServer().getIconUrl(),
+                invitation.getInviter().getUsername(),
+                invitation.getStatus(),
+                invitation.getCreatedAt()
+        );
+    }
+
     private ServerMember requireMember(Server server, User user) {
         return serverMemberRepository.findByServerAndUser(server, user)
                 .orElseThrow(() -> new RuntimeException("No eres miembro de este servidor"));
@@ -273,5 +345,15 @@ public class ServerService {
         return serverMemberRepository.findByServerAndUser(server, user)
                 .map(ServerMember::getRole)
                 .orElse("member");
+    }
+
+    private java.util.Optional<User> findUserByUsernameOrEmail(String value) {
+        String cleanValue = value == null ? "" : value.trim();
+        if (cleanValue.contains("@")) {
+            return userRepository.findByEmail(cleanValue)
+                    .or(() -> userRepository.findByUsername(cleanValue));
+        }
+        return userRepository.findByUsername(cleanValue)
+                .or(() -> userRepository.findByEmail(cleanValue));
     }
 }

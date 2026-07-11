@@ -75,11 +75,31 @@ public class ServerController {
     }
 
     @PostMapping("/{serverId}/members")
-    public ResponseEntity<ServerMemberResponse> inviteMember(
+    public ResponseEntity<ServerInvitationResponse> inviteMember(
             @PathVariable UUID serverId,
             @Valid @RequestBody InviteServerMemberRequest request,
             Principal principal) {
         return ResponseEntity.ok(serverService.inviteMember(serverId, request, principal.getName()));
+    }
+
+    @GetMapping("/invitations/pending")
+    public ResponseEntity<List<ServerInvitationResponse>> getPendingInvitations(Principal principal) {
+        return ResponseEntity.ok(serverService.getPendingInvitations(principal.getName()));
+    }
+
+    @PostMapping("/invitations/{invitationId}/accept")
+    public ResponseEntity<ServerResponse> acceptInvitation(
+            @PathVariable UUID invitationId,
+            Principal principal) {
+        return ResponseEntity.ok(serverService.acceptInvitation(invitationId, principal.getName()));
+    }
+
+    @PostMapping("/invitations/{invitationId}/reject")
+    public ResponseEntity<Void> rejectInvitation(
+            @PathVariable UUID invitationId,
+            Principal principal) {
+        serverService.rejectInvitation(invitationId, principal.getName());
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{serverId}/leave")

@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class InviteServerMemberRequest {
 
-    @NotBlank(message = "El usuario es obligatorio")
-    @Size(min = 3, max = 50)
+    @NotBlank(message = "El usuario o email es obligatorio")
+    @Size(min = 3, max = 254)
     private String username;
 }
