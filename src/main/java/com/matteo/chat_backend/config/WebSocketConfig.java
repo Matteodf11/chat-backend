@@ -47,7 +47,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     try {
                         String token = authHeader.substring(7);
                         String email = jwtService.extractUsername(token);
-                        if (email == null || !jwtService.isTokenValid(token, email) || !userRepository.existsByEmail(email)) {
+                        var user = email == null ? null : userRepository.findByEmail(email).orElse(null);
+                        if (user == null || !jwtService.isTokenValid(token, email)
+                                || jwtService.extractTokenVersion(token) != user.getTokenVersion()) {
                             throw new MessageDeliveryException("Token WebSocket no valido");
                         }
                         accessor.setUser(() -> email);

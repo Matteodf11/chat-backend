@@ -42,4 +42,7 @@ public class User {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 0;
 }

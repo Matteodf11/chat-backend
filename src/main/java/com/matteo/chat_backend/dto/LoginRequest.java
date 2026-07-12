@@ -16,4 +16,9 @@ public class LoginRequest {
     @NotBlank
     @Size(max = 72)
     private String password;
+
+    private Boolean rememberMe = false;
+
+    @Size(max = 120)
+    private String deviceName;
 }
