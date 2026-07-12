@@ -6,6 +6,7 @@ import com.matteo.chat_backend.service.PresenceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
@@ -19,7 +20,8 @@ public class WebSocketEventListener {
 
     @EventListener
     public void handleConnect(SessionConnectEvent event) {
-        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
+        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(event.getMessage(), StompHeaderAccessor.class);
+        if (accessor == null) return;
         String token = extractToken(accessor);
         if (token != null) {
             String email = jwtService.extractUsername(token);
@@ -31,7 +33,8 @@ public class WebSocketEventListener {
 
     @EventListener
     public void handleDisconnect(SessionDisconnectEvent event) {
-        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
+        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(event.getMessage(), StompHeaderAccessor.class);
+        if (accessor == null) return;
         presenceService.disconnect(accessor.getSessionId());
     }
 
