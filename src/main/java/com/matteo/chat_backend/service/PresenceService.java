@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @RequiredArgsConstructor
@@ -21,29 +20,30 @@ public class PresenceService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final Map<String, String> sessionEmails = new ConcurrentHashMap<>();
-    private final Map<String, AtomicInteger> openSessionsByEmail = new ConcurrentHashMap<>();
-    private final Set<String> provisionalOnlineEmails = ConcurrentHashMap.newKeySet();
+    private final Map<String, Set<String>> openSessionsByEmail = new ConcurrentHashMap<>();
 
     public void connect(String sessionId, String email) {
         if (sessionId == null || email == null) return;
 
-        sessionEmails.put(sessionId, email);
-        int openSessions = openSessionsByEmail
-                .computeIfAbsent(email, ignored -> new AtomicInteger(0))
-                .incrementAndGet();
+        String previousEmail = sessionEmails.putIfAbsent(sessionId, email);
+        if (previousEmail != null) return;
 
-        setOnlineStatus(email, true);
+        Set<String> sessions = openSessionsByEmail.computeIfAbsent(email, ignored -> ConcurrentHashMap.newKeySet());
+        boolean wasOffline = sessions.isEmpty();
+        sessions.add(sessionId);
+        if (wasOffline) setOnlineStatus(email, true);
     }
 
     public void disconnect(String sessionId) {
         String email = sessionEmails.remove(sessionId);
         if (email == null) return;
 
-        AtomicInteger openSessions = openSessionsByEmail.get(email);
-        int offlineThreshold = provisionalOnlineEmails.contains(email) ? 1 : 0;
-        if (openSessions != null && openSessions.decrementAndGet() <= offlineThreshold) {
-            openSessionsByEmail.remove(email);
-            provisionalOnlineEmails.remove(email);
+        Set<String> sessions = openSessionsByEmail.get(email);
+        if (sessions == null) return;
+
+        sessions.remove(sessionId);
+        if (sessions.isEmpty()) {
+            openSessionsByEmail.remove(email, sessions);
             setOnlineStatus(email, false);
         }
     }
@@ -53,16 +53,15 @@ public class PresenceService {
 
         sessionEmails.entrySet().removeIf(entry -> email.equals(entry.getValue()));
         openSessionsByEmail.remove(email);
-        provisionalOnlineEmails.remove(email);
         setOnlineStatus(email, false);
     }
 
+    /**
+     * Kept for compatibility with older clients. Presence is established by an
+     * authenticated WebSocket session, so an HTTP request cannot make it online.
+     */
     public void markOnline(String email) {
-        if (email == null) return;
-
-        provisionalOnlineEmails.add(email);
-        openSessionsByEmail.computeIfAbsent(email, ignored -> new AtomicInteger(1));
-        setOnlineStatus(email, true);
+        // No-op by design.
     }
 
     public boolean isOnline(User user) {
@@ -70,8 +69,8 @@ public class PresenceService {
     }
 
     public boolean isOnline(String email) {
-        AtomicInteger openSessions = openSessionsByEmail.get(email);
-        return openSessions != null && openSessions.get() > 0;
+        Set<String> openSessions = openSessionsByEmail.get(email);
+        return openSessions != null && !openSessions.isEmpty();
     }
 
     private void setOnlineStatus(String email, boolean online) {
