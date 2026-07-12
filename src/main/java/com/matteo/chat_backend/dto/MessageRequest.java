@@ -12,4 +12,5 @@ public class MessageRequest {
     private String content;
     private UUID channelId;
     private UUID dmId;
+    private UUID replyToId;
 }

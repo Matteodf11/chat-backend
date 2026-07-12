@@ -17,5 +17,8 @@ public class MessageResponse {
     private UUID dmId;
     private Boolean edited;
     private Boolean deleted;
+    private UUID replyToId;
+    private String replyToSenderUsername;
+    private String replyToContent;
     private LocalDateTime createdAt;
 }

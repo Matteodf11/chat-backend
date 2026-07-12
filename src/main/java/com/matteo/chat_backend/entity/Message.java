@@ -26,6 +26,10 @@ public class Message {
     @JoinColumn(name = "dm_id")
     private DirectMessage directMessage;
 
+    @ManyToOne
+    @JoinColumn(name = "reply_to_id")
+    private Message replyTo;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 

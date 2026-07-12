@@ -49,6 +49,13 @@ public class MessageService {
             message.setDirectMessage(directMessage);
         }
 
+        if (request.getReplyToId() != null) {
+            Message replyTo = messageRepository.findById(request.getReplyToId())
+                    .orElseThrow(() -> new IllegalArgumentException("El mensaje al que respondes ya no existe"));
+            requireSameDestination(message, replyTo);
+            message.setReplyTo(replyTo);
+        }
+
         return toResponse(messageRepository.save(message));
     }
 
@@ -111,8 +118,26 @@ public class MessageService {
                 message.getDirectMessage() != null ? message.getDirectMessage().getId() : null,
                 message.getEdited(),
                 false,
+                message.getReplyTo() != null ? message.getReplyTo().getId() : null,
+                message.getReplyTo() != null ? message.getReplyTo().getSender().getUsername() : null,
+                message.getReplyTo() != null ? replyPreview(message.getReplyTo()) : null,
                 message.getCreatedAt()
         );
+    }
+
+    private void requireSameDestination(Message message, Message replyTo) {
+        boolean sameChannel = message.getChannel() != null && replyTo.getChannel() != null
+                && message.getChannel().getId().equals(replyTo.getChannel().getId());
+        boolean sameDm = message.getDirectMessage() != null && replyTo.getDirectMessage() != null
+                && message.getDirectMessage().getId().equals(replyTo.getDirectMessage().getId());
+        if (!sameChannel && !sameDm) {
+            throw new IllegalArgumentException("Solo puedes responder a un mensaje de esta conversacion");
+        }
+    }
+
+    private String replyPreview(Message message) {
+        String content = cryptoService.decrypt(message.getContent());
+        return content.length() <= 180 ? content : content.substring(0, 180) + "...";
     }
 
     private Message requireOwnedMessage(UUID messageId, String requesterEmail) {
