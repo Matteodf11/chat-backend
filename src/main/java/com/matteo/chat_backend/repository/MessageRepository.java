@@ -8,10 +8,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 public interface MessageRepository extends JpaRepository<Message, UUID> {
-    List<Message> findByChannelIdOrderByCreatedAtAsc(UUID channelId);
-    List<Message> findByDirectMessageIdOrderByCreatedAtAsc(UUID dmId, Pageable pageable);
+    List<Message> findByChannelIdAndCreatedAtBeforeOrderByCreatedAtDesc(UUID channelId, LocalDateTime before, Pageable pageable);
+    List<Message> findByDirectMessageIdAndCreatedAtBeforeOrderByCreatedAtDesc(UUID dmId, LocalDateTime before, Pageable pageable);
 
     @Modifying
     @Query("DELETE FROM Message m WHERE m.channel.id IN :channelIds")

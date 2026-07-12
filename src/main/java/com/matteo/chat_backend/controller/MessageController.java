@@ -10,8 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.List;
 import java.util.UUID;
+import java.time.LocalDateTime;
+import com.matteo.chat_backend.dto.MessagePageResponse;
 
 @RestController
 @RequestMapping("/api/messages")
@@ -22,8 +23,12 @@ public class MessageController {
     private final SimpMessagingTemplate messagingTemplate;
 
     @GetMapping("/channel/{channelId}")
-    public ResponseEntity<List<MessageResponse>> getChannelMessages(@PathVariable UUID channelId, Principal principal) {
-        return ResponseEntity.ok(messageService.getChannelMessages(channelId, principal.getName()));
+    public ResponseEntity<MessagePageResponse> getChannelMessages(
+            @PathVariable UUID channelId,
+            @RequestParam(required = false) LocalDateTime before,
+            @RequestParam(defaultValue = "50") int limit,
+            Principal principal) {
+        return ResponseEntity.ok(messageService.getChannelMessages(channelId, before, limit, principal.getName()));
     }
 
     @PostMapping("/channel/{channelId}")
@@ -39,8 +44,12 @@ public class MessageController {
     }
 
     @GetMapping("/dm/{dmId}")
-    public ResponseEntity<List<MessageResponse>> getDmMessages(@PathVariable UUID dmId, Principal principal) {
-        return ResponseEntity.ok(messageService.getDmMessages(dmId, principal.getName()));
+    public ResponseEntity<MessagePageResponse> getDmMessages(
+            @PathVariable UUID dmId,
+            @RequestParam(required = false) LocalDateTime before,
+            @RequestParam(defaultValue = "50") int limit,
+            Principal principal) {
+        return ResponseEntity.ok(messageService.getDmMessages(dmId, before, limit, principal.getName()));
     }
 
     @PostMapping("/dm/{dmId}")
@@ -56,5 +65,30 @@ public class MessageController {
         messagingTemplate.convertAndSendToUser(dm.getUser1().getEmail(), "/queue/messages", response);
         messagingTemplate.convertAndSendToUser(dm.getUser2().getEmail(), "/queue/messages", response);
         return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{messageId}")
+    public ResponseEntity<MessageResponse> editMessage(
+            @PathVariable UUID messageId,
+            @Valid @RequestBody MessageRequest request,
+            Principal principal) {
+        MessageResponse response = messageService.editMessage(messageId, request.getContent(), principal.getName());
+        publishMessageChange(response);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{messageId}")
+    public ResponseEntity<Void> deleteMessage(@PathVariable UUID messageId, Principal principal) {
+        MessageResponse response = messageService.deleteMessage(messageId, principal.getName());
+        publishMessageChange(response);
+        return ResponseEntity.noContent().build();
+    }
+
+    private void publishMessageChange(MessageResponse response) {
+        if (response.getChannelId() != null) {
+            messagingTemplate.convertAndSend("/topic/channel." + response.getChannelId(), response);
+        } else {
+            messagingTemplate.convertAndSend("/topic/dm." + response.getDmId(), response);
+        }
     }
 }

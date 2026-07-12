@@ -2,6 +2,7 @@ package com.matteo.chat_backend.service;
 
 import com.matteo.chat_backend.dto.MessageRequest;
 import com.matteo.chat_backend.dto.MessageResponse;
+import com.matteo.chat_backend.dto.MessagePageResponse;
 import com.matteo.chat_backend.dto.TypingRequest;
 import com.matteo.chat_backend.entity.Channel;
 import com.matteo.chat_backend.entity.DirectMessage;
@@ -9,7 +10,7 @@ import com.matteo.chat_backend.entity.Message;
 import com.matteo.chat_backend.entity.User;
 import com.matteo.chat_backend.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -50,16 +52,37 @@ public class MessageService {
         return toResponse(messageRepository.save(message));
     }
 
-    public List<MessageResponse> getChannelMessages(UUID channelId, String requesterEmail) {
+    public MessagePageResponse getChannelMessages(UUID channelId, LocalDateTime before, int limit, String requesterEmail) {
         authorizationService.requireChannelAccess(channelId, requesterEmail);
-        return messageRepository.findByChannelIdOrderByCreatedAtAsc(channelId)
-                .stream().map(this::toResponse).toList();
+        return toPage(messageRepository.findByChannelIdAndCreatedAtBeforeOrderByCreatedAtDesc(
+                channelId, cursor(before), PageRequest.of(0, normalizedLimit(limit) + 1)), normalizedLimit(limit));
     }
 
-    public List<MessageResponse> getDmMessages(UUID dmId, String requesterEmail) {
+    public MessagePageResponse getDmMessages(UUID dmId, LocalDateTime before, int limit, String requesterEmail) {
         authorizationService.requireDirectMessageAccess(dmId, requesterEmail);
-        return messageRepository.findByDirectMessageIdOrderByCreatedAtAsc(dmId, Pageable.unpaged())
-                .stream().map(this::toResponse).toList();
+        return toPage(messageRepository.findByDirectMessageIdAndCreatedAtBeforeOrderByCreatedAtDesc(
+                dmId, cursor(before), PageRequest.of(0, normalizedLimit(limit) + 1)), normalizedLimit(limit));
+    }
+
+    @Transactional
+    public MessageResponse editMessage(UUID messageId, String content, String requesterEmail) {
+        Message message = requireOwnedMessage(messageId, requesterEmail);
+        if (content == null || content.isBlank() || content.length() > 4000) {
+            throw new IllegalArgumentException("El mensaje debe contener entre 1 y 4000 caracteres");
+        }
+        message.setContent(cryptoService.encrypt(content.trim()));
+        message.setEdited(true);
+        return toResponse(messageRepository.save(message));
+    }
+
+    @Transactional
+    public MessageResponse deleteMessage(UUID messageId, String requesterEmail) {
+        Message message = requireOwnedMessage(messageId, requesterEmail);
+        MessageResponse response = toResponse(message);
+        response.setContent("");
+        response.setDeleted(true);
+        messageRepository.delete(message);
+        return response;
     }
 
     public DirectMessage getDirectMessage(UUID dmId, String requesterEmail) {
@@ -87,8 +110,39 @@ public class MessageService {
                 message.getChannel() != null ? message.getChannel().getId() : null,
                 message.getDirectMessage() != null ? message.getDirectMessage().getId() : null,
                 message.getEdited(),
+                false,
                 message.getCreatedAt()
         );
+    }
+
+    private Message requireOwnedMessage(UUID messageId, String requesterEmail) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Mensaje no encontrado"));
+        authorizationService.requireUser(requesterEmail);
+        if (!message.getSender().getEmail().equalsIgnoreCase(requesterEmail)) {
+            throw new org.springframework.security.access.AccessDeniedException("Solo puedes modificar tus propios mensajes");
+        }
+        if (message.getChannel() != null) {
+            authorizationService.requireChannelAccess(message.getChannel().getId(), requesterEmail);
+        } else {
+            authorizationService.requireDirectMessageAccess(message.getDirectMessage().getId(), requesterEmail);
+        }
+        return message;
+    }
+
+    private MessagePageResponse toPage(List<Message> descending, int limit) {
+        boolean hasMore = descending.size() > limit;
+        List<Message> page = new ArrayList<>(descending.subList(0, Math.min(limit, descending.size())));
+        java.util.Collections.reverse(page);
+        return new MessagePageResponse(page.stream().map(this::toResponse).toList(), hasMore);
+    }
+
+    private int normalizedLimit(int limit) {
+        return Math.max(1, Math.min(limit, 100));
+    }
+
+    private LocalDateTime cursor(LocalDateTime before) {
+        return before != null ? before : LocalDateTime.of(9999, 12, 31, 23, 59, 59);
     }
 
     private void validateDestination(UUID channelId, UUID dmId) {

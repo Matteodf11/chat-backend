@@ -16,5 +16,6 @@ public class MessageResponse {
     private UUID channelId;
     private UUID dmId;
     private Boolean edited;
+    private Boolean deleted;
     private LocalDateTime createdAt;
 }
