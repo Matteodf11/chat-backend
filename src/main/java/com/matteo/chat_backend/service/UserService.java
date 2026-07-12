@@ -127,7 +127,8 @@ public class UserService {
     }
 
     public void markOffline(String email) {
-        presenceService.disconnectAll(email);
+        // Presence is scoped to WebSocket sessions. Closing one client must not
+        // disconnect other windows or devices belonging to the same account.
     }
 
     public void markOnline(String email) {
