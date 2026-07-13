@@ -174,7 +174,9 @@ public class MessageService {
     private String replyPreview(Message message) {
         String content = cryptoService.decrypt(message.getContent());
         if (content.isBlank() && message.getAttachmentName() != null) {
-            return "Archivo: " + message.getAttachmentName();
+            return message.getAttachmentContentType() != null && message.getAttachmentContentType().startsWith("audio/")
+                    ? "Nota de voz"
+                    : "Archivo: " + message.getAttachmentName();
         }
         return content.length() <= 180 ? content : content.substring(0, 180) + "...";
     }

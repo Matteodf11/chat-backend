@@ -24,6 +24,7 @@ public class AttachmentStorageService {
     public static final long MAX_ATTACHMENT_BYTES = 25L * 1024L * 1024L;
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif",
+            "audio/wav", "audio/x-wav",
             "application/pdf", "text/plain", "text/csv", "application/zip",
             "application/x-zip-compressed", "application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -126,6 +127,9 @@ public class AttachmentStorageService {
             case "image/webp" -> startsWith(bytes, 0x52, 0x49, 0x46, 0x46) && bytes.length > 11
                     && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50;
             case "application/pdf" -> startsWith(bytes, 0x25, 0x50, 0x44, 0x46);
+            case "audio/wav", "audio/x-wav" -> startsWith(bytes, 0x52, 0x49, 0x46, 0x46)
+                    && bytes.length > 11 && bytes[8] == 0x57 && bytes[9] == 0x41
+                    && bytes[10] == 0x56 && bytes[11] == 0x45;
             case "application/zip", "application/x-zip-compressed",
                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
