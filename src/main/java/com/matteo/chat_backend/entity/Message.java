@@ -33,6 +33,18 @@ public class Message {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "attachment_key", length = 500)
+    private String attachmentKey;
+
+    @Column(name = "attachment_name")
+    private String attachmentName;
+
+    @Column(name = "attachment_content_type", length = 150)
+    private String attachmentContentType;
+
+    @Column(name = "attachment_size")
+    private Long attachmentSize;
+
     private Boolean edited = false;
 
     @Column(name = "created_at")

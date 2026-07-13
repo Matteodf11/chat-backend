@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.Duration;
@@ -28,16 +29,33 @@ public class MessageService {
     private final ChatAuthorizationService authorizationService;
     private final MessageCryptoService cryptoService;
     private final RequestRateLimiter rateLimiter;
+    private final AttachmentStorageService attachmentStorageService;
 
     @Transactional
     public MessageResponse saveMessage(MessageRequest request, String senderEmail) {
+        if (request.getContent() == null || request.getContent().isBlank()) {
+            throw new IllegalArgumentException("El mensaje no puede estar vacio");
+        }
+        return saveMessage(request, senderEmail, null);
+    }
+
+    @Transactional
+    public MessageResponse saveAttachmentMessage(MessageRequest request, MultipartFile file, String senderEmail) {
+        return saveMessage(request, senderEmail, file);
+    }
+
+    private MessageResponse saveMessage(MessageRequest request, String senderEmail, MultipartFile attachmentFile) {
         validateDestination(request.getChannelId(), request.getDmId());
         rateLimiter.requireCapacity("message:" + senderEmail, 30, Duration.ofSeconds(10), "Estas enviando mensajes demasiado rapido");
         User sender = authorizationService.requireUser(senderEmail);
 
         Message message = new Message();
         message.setSender(sender);
-        message.setContent(cryptoService.encrypt(request.getContent()));
+        String content = request.getContent() == null ? "" : request.getContent().trim();
+        if (content.length() > 4000) {
+            throw new IllegalArgumentException("El mensaje no puede superar 4000 caracteres");
+        }
+        message.setContent(cryptoService.encrypt(content));
         message.setEdited(false);
         message.setCreatedAt(LocalDateTime.now());
 
@@ -56,7 +74,20 @@ public class MessageService {
             message.setReplyTo(replyTo);
         }
 
-        return toResponse(messageRepository.save(message));
+        AttachmentStorageService.StoredAttachment attachment = null;
+        try {
+            if (attachmentFile != null) {
+                attachment = attachmentStorageService.upload(attachmentFile);
+                message.setAttachmentKey(attachment.key());
+                message.setAttachmentName(attachment.name());
+                message.setAttachmentContentType(attachment.contentType());
+                message.setAttachmentSize(attachment.size());
+            }
+            return toResponse(messageRepository.save(message));
+        } catch (RuntimeException exception) {
+            if (attachment != null) attachmentStorageService.delete(attachment.key());
+            throw exception;
+        }
     }
 
     public MessagePageResponse getChannelMessages(UUID channelId, LocalDateTime before, int limit, String requesterEmail) {
@@ -89,6 +120,7 @@ public class MessageService {
         response.setContent("");
         response.setDeleted(true);
         messageRepository.delete(message);
+        attachmentStorageService.delete(message.getAttachmentKey());
         return response;
     }
 
@@ -121,6 +153,10 @@ public class MessageService {
                 message.getReplyTo() != null ? message.getReplyTo().getId() : null,
                 message.getReplyTo() != null ? message.getReplyTo().getSender().getUsername() : null,
                 message.getReplyTo() != null ? replyPreview(message.getReplyTo()) : null,
+                message.getAttachmentName(),
+                message.getAttachmentContentType(),
+                message.getAttachmentSize(),
+                attachmentStorageService.createSignedUrl(message.getAttachmentKey()),
                 message.getCreatedAt()
         );
     }
@@ -137,6 +173,9 @@ public class MessageService {
 
     private String replyPreview(Message message) {
         String content = cryptoService.decrypt(message.getContent());
+        if (content.isBlank() && message.getAttachmentName() != null) {
+            return "Archivo: " + message.getAttachmentName();
+        }
         return content.length() <= 180 ? content : content.substring(0, 180) + "...";
     }
 

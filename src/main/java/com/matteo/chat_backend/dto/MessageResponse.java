@@ -20,5 +20,9 @@ public class MessageResponse {
     private UUID replyToId;
     private String replyToSenderUsername;
     private String replyToContent;
+    private String attachmentName;
+    private String attachmentContentType;
+    private Long attachmentSize;
+    private String attachmentUrl;
     private LocalDateTime createdAt;
 }

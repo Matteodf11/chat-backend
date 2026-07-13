@@ -32,14 +32,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, String>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         Map<String, String> error = new HashMap<>();
-        error.put("error", "El avatar no puede superar 2 MB");
+        error.put("error", "El archivo supera el tamano permitido");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
     @ExceptionHandler(MultipartException.class)
     public ResponseEntity<Map<String, String>> handleMultipart(MultipartException ex) {
         Map<String, String> error = new HashMap<>();
-        error.put("error", "No se pudo leer el archivo seleccionado. Prueba con una imagen JPG, PNG o WEBP de menos de 2 MB.");
+        error.put("error", "No se pudo leer el archivo seleccionado");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
