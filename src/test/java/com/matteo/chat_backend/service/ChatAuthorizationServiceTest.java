@@ -40,7 +40,7 @@ class ChatAuthorizationServiceTest {
         requester = new User();
         requester.setId(UUID.randomUUID());
         requester.setEmail("user@example.com");
-        when(userRepository.findByEmail(requester.getEmail())).thenReturn(Optional.of(requester));
+        lenient().when(userRepository.findByEmail(requester.getEmail())).thenReturn(Optional.of(requester));
     }
 
     @Test
@@ -79,5 +79,11 @@ class ChatAuthorizationServiceTest {
     void rejectsSubscriptionToAnotherUsersFriendEvents() {
         assertThrows(AccessDeniedException.class, () ->
                 service.requireSubscriptionAccess("/topic/friends." + UUID.randomUUID(), requester.getEmail()));
+    }
+
+    @Test
+    void rejectsUnknownSubscriptionDestination() {
+        assertThrows(AccessDeniedException.class, () ->
+                service.requireSubscriptionAccess("/topic/private-data", requester.getEmail()));
     }
 }

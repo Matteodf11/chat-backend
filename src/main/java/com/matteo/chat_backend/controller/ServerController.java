@@ -29,13 +29,6 @@ public class ServerController {
         return ResponseEntity.ok(serverService.createServer(request, principal.getName()));
     }
 
-    @PostMapping("/{serverId}/join")
-    public ResponseEntity<ServerResponse> joinServer(
-            @PathVariable UUID serverId,
-            Principal principal) {
-        return ResponseEntity.ok(serverService.joinServer(serverId, principal.getName()));
-    }
-
     @GetMapping("/me")
     public ResponseEntity<List<ServerResponse>> getMyServers(Principal principal) {
         return ResponseEntity.ok(serverService.getMyServers(principal.getName()));
@@ -99,6 +92,24 @@ public class ServerController {
             @PathVariable UUID serverId,
             Principal principal) {
         return ResponseEntity.ok(serverService.getServerMembers(serverId, principal.getName()));
+    }
+
+    @PutMapping("/{serverId}/members/{userId}/role")
+    public ResponseEntity<ServerMemberResponse> updateMemberRole(
+            @PathVariable UUID serverId,
+            @PathVariable UUID userId,
+            @Valid @RequestBody UpdateServerMemberRoleRequest request,
+            Principal principal) {
+        return ResponseEntity.ok(serverService.updateMemberRole(serverId, userId, request.getRole(), principal.getName()));
+    }
+
+    @DeleteMapping("/{serverId}/members/{userId}")
+    public ResponseEntity<Void> removeMember(
+            @PathVariable UUID serverId,
+            @PathVariable UUID userId,
+            Principal principal) {
+        serverService.removeMember(serverId, userId, principal.getName());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{serverId}/members")

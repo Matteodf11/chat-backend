@@ -50,6 +50,14 @@ public class ChatAuthorizationService {
     }
 
     public void requireSubscriptionAccess(String destination, String email) {
+        if (destination == null) {
+            throw new AccessDeniedException("Destino no valido");
+        }
+        if (destination.equals("/topic/presence") || destination.equals("/topic/profile")
+                || destination.equals("/user/queue/messages") || destination.equals("/user/queue/friends")
+                || destination.equals("/user/queue/server-events")) {
+            return;
+        }
         UUID channelId = destinationId(destination, "/topic/channel.", "/topic/typing.channel.");
         if (channelId != null) {
             requireChannelAccess(channelId, email);
@@ -64,6 +72,10 @@ public class ChatAuthorizationService {
         if (friendUserId != null && !requireUser(email).getId().equals(friendUserId)) {
             throw new AccessDeniedException("No tienes acceso a estos eventos");
         }
+        if (friendUserId != null) {
+            return;
+        }
+        throw new AccessDeniedException("Destino de suscripcion no permitido");
     }
 
     private UUID destinationId(String destination, String... prefixes) {

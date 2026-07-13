@@ -7,6 +7,7 @@ import com.matteo.chat_backend.dto.InviteServerMemberRequest;
 import com.matteo.chat_backend.dto.ServerInvitationResponse;
 import com.matteo.chat_backend.dto.ServerMemberResponse;
 import com.matteo.chat_backend.dto.ServerResponse;
+import com.matteo.chat_backend.dto.ServerEventResponse;
 import com.matteo.chat_backend.dto.UpdateServerRequest;
 import com.matteo.chat_backend.entity.Channel;
 import com.matteo.chat_backend.entity.Server;
@@ -22,11 +23,13 @@ import com.matteo.chat_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +43,7 @@ public class ServerService {
     private final MessageRepository messageRepository;
     private final ServerInvitationRepository serverInvitationRepository;
     private final AvatarStorageService avatarStorageService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public ServerResponse createServer(CreateServerRequest request, String email) {
@@ -49,7 +53,7 @@ public class ServerService {
         Server server = new Server();
         server.setName(request.getName());
         server.setDescription(request.getDescription());
-        server.setIconUrl(request.getIconUrl());
+        server.setIconUrl(null);
         server.setOwner(owner);
         server.setCreatedAt(LocalDateTime.now());
         serverRepository.save(server);
@@ -69,27 +73,6 @@ public class ServerService {
         channelRepository.save(general);
 
         return toResponse(server, "owner");
-    }
-
-    @Transactional
-    public ServerResponse joinServer(UUID serverId, String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
-
-        if (serverMemberRepository.existsByServerAndUser(server, user)) {
-            throw new RuntimeException("Ya eres miembro de este servidor");
-        }
-
-        ServerMember member = new ServerMember();
-        member.setServer(server);
-        member.setUser(user);
-        member.setRole("member");
-        member.setJoinedAt(LocalDateTime.now());
-        serverMemberRepository.save(member);
-
-        return toResponse(server, "member");
     }
 
     public List<ServerResponse> getMyServers(String email) {
@@ -125,10 +108,6 @@ public class ServerService {
         if (request.getDescription() != null) {
             server.setDescription(request.getDescription());
         }
-        if (request.getIconUrl() != null) {
-            server.setIconUrl(request.getIconUrl());
-        }
-
         serverRepository.save(server);
         return toResponse(server, member.getRole());
     }
@@ -161,7 +140,7 @@ public class ServerService {
         Channel channel = new Channel();
         channel.setServer(server);
         channel.setName(request.getName());
-        channel.setType(request.getType());
+        channel.setType("text");
         channel.setCreatedAt(LocalDateTime.now());
         channelRepository.save(channel);
 
@@ -185,7 +164,67 @@ public class ServerService {
                 .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
         requireMember(server, user);
         return serverMemberRepository.findByServer(server)
-                .stream().map(this::toMemberResponse).collect(Collectors.toList());
+                .stream()
+                .sorted(Comparator.comparingInt(this::roleOrder)
+                        .thenComparing(member -> member.getUser().getUsername(), String.CASE_INSENSITIVE_ORDER))
+                .map(this::toMemberResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public ServerMemberResponse updateMemberRole(UUID serverId, UUID targetUserId, String role, String email) {
+        User actor = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+        requireOwner(server, actor);
+
+        if (!"admin".equals(role) && !"member".equals(role)) {
+            throw new IllegalArgumentException("Rol no valido");
+        }
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("Miembro no encontrado"));
+        ServerMember target = requireMember(server, targetUser);
+        if (server.getOwner().getId().equals(targetUserId) || "owner".equals(target.getRole())) {
+            throw new RuntimeException("No puedes cambiar el rol del dueno");
+        }
+        target.setRole(role);
+        ServerMemberResponse response = toMemberResponse(serverMemberRepository.save(target));
+        messagingTemplate.convertAndSendToUser(
+                targetUser.getEmail(),
+                "/queue/server-events",
+                new ServerEventResponse("ROLE_UPDATED", serverId, role)
+        );
+        return response;
+    }
+
+    @Transactional
+    public void removeMember(UUID serverId, UUID targetUserId, String email) {
+        User actor = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+        ServerMember actorMember = requireManager(server, actor);
+        User targetUser = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("Miembro no encontrado"));
+        ServerMember target = requireMember(server, targetUser);
+
+        if (actor.getId().equals(targetUserId)) {
+            throw new RuntimeException("Usa la opcion de salir del servidor");
+        }
+        if (server.getOwner().getId().equals(targetUserId) || "owner".equals(target.getRole())) {
+            throw new RuntimeException("El dueno no puede ser expulsado");
+        }
+        if ("admin".equals(actorMember.getRole()) && !"member".equals(target.getRole())) {
+            throw new RuntimeException("Un administrador solo puede expulsar miembros");
+        }
+        serverMemberRepository.delete(target);
+        serverMemberRepository.flush();
+        messagingTemplate.convertAndSendToUser(
+                targetUser.getEmail(),
+                "/queue/server-events",
+                new ServerEventResponse("MEMBER_REMOVED", serverId, null)
+        );
     }
 
     @Transactional
@@ -274,7 +313,7 @@ public class ServerService {
                 .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
         ServerMember member = requireMember(server, user);
         if ("owner".equals(member.getRole()) || server.getOwner().getId().equals(user.getId())) {
-            throw new RuntimeException("El dueno debe borrar el servidor o transferirlo antes de salir");
+            throw new RuntimeException("El dueno debe borrar el servidor antes de salir");
         }
         serverMemberRepository.delete(member);
     }
@@ -289,6 +328,10 @@ public class ServerService {
             throw new RuntimeException("Solo el dueno puede borrar este servidor");
         }
 
+        List<String> memberEmails = serverMemberRepository.findByServer(server).stream()
+                .map(member -> member.getUser().getEmail())
+                .filter(memberEmail -> !memberEmail.equalsIgnoreCase(email))
+                .toList();
         List<UUID> channelIds = channelRepository.findByServerId(serverId)
                 .stream().map(Channel::getId).toList();
         if (!channelIds.isEmpty()) {
@@ -298,6 +341,11 @@ public class ServerService {
         channelRepository.deleteByServerId(serverId);
         serverMemberRepository.deleteByServer(server);
         serverRepository.delete(server);
+        memberEmails.forEach(memberEmail -> messagingTemplate.convertAndSendToUser(
+                memberEmail,
+                "/queue/server-events",
+                new ServerEventResponse("SERVER_DELETED", serverId, null)
+        ));
     }
 
     private ServerResponse toResponse(Server server, String myRole) {
@@ -356,6 +404,22 @@ public class ServerService {
             throw new RuntimeException("No tienes permisos para gestionar este servidor");
         }
         return member;
+    }
+
+    private ServerMember requireOwner(Server server, User user) {
+        ServerMember member = requireMember(server, user);
+        if (!server.getOwner().getId().equals(user.getId()) || !"owner".equals(member.getRole())) {
+            throw new RuntimeException("Solo el dueno puede gestionar los roles");
+        }
+        return member;
+    }
+
+    private int roleOrder(ServerMember member) {
+        return switch (member.getRole()) {
+            case "owner" -> 0;
+            case "admin" -> 1;
+            default -> 2;
+        };
     }
 
     private String roleFor(Server server, User user) {
