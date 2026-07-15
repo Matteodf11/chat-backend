@@ -8,10 +8,12 @@ import com.matteo.chat_backend.entity.Friendship;
 import com.matteo.chat_backend.entity.User;
 import com.matteo.chat_backend.repository.DirectMessageRepository;
 import com.matteo.chat_backend.repository.FriendshipRepository;
+import com.matteo.chat_backend.repository.MessageRepository;
 import com.matteo.chat_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,6 +27,7 @@ public class FriendshipService {
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
     private final DirectMessageRepository directMessageRepository;
+    private final MessageRepository messageRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final PresenceService presenceService;
 
@@ -113,7 +116,10 @@ public class FriendshipService {
                     DirectMessage newDm = new DirectMessage();
                     newDm.setUser1(user);
                     newDm.setUser2(other);
-                    newDm.setCreatedAt(LocalDateTime.now());
+                    LocalDateTime now = LocalDateTime.now();
+                    newDm.setCreatedAt(now);
+                    newDm.setUser1LastReadAt(now);
+                    newDm.setUser2LastReadAt(now);
                     return directMessageRepository.save(newDm);
                 });
 
@@ -137,6 +143,23 @@ public class FriendshipService {
         return result;
     }
 
+    @Transactional
+    public void markDmRead(UUID dmId, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        DirectMessage dm = directMessageRepository.findById(dmId)
+                .orElseThrow(() -> new RuntimeException("Conversacion no encontrada"));
+        LocalDateTime now = LocalDateTime.now();
+        if (dm.getUser1().getId().equals(user.getId())) {
+            dm.setUser1LastReadAt(now);
+        } else if (dm.getUser2().getId().equals(user.getId())) {
+            dm.setUser2LastReadAt(now);
+        } else {
+            throw new org.springframework.security.access.AccessDeniedException("No tienes acceso a esta conversacion");
+        }
+        directMessageRepository.save(dm);
+    }
+
     private FriendshipResponse toResponse(Friendship f, User currentUser) {
         User friend = f.getRequester().getId().equals(currentUser.getId())
                 ? f.getReceiver() : f.getRequester();
@@ -156,12 +179,19 @@ public class FriendshipService {
     private DmResponse toDmResponse(DirectMessage dm, User currentUser) {
         User other = dm.getUser1().getId().equals(currentUser.getId())
                 ? dm.getUser2() : dm.getUser1();
+        LocalDateTime lastReadAt = dm.getUser1().getId().equals(currentUser.getId())
+                ? dm.getUser1LastReadAt() : dm.getUser2LastReadAt();
+        if (lastReadAt == null) lastReadAt = dm.getCreatedAt();
+        boolean hasUnread = messageRepository.countUnreadDmMessages(
+                dm.getId(), currentUser.getId(), lastReadAt
+        ) > 0;
         return new DmResponse(
                 dm.getId(),
                 other.getId(),
                 other.getUsername(),
                 other.getAvatarUrl(),
                 presenceService.isOnline(other),
+                hasUnread,
                 dm.getCreatedAt()
         );
     }

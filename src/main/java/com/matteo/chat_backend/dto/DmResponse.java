@@ -13,5 +13,6 @@ public class DmResponse {
     private String otherUsername;
     private String otherAvatar;
     private Boolean otherIsOnline;
+    private Boolean hasUnread;
     private LocalDateTime createdAt;
 }

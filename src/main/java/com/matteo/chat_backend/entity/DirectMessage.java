@@ -24,4 +24,10 @@ public class DirectMessage {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "user1_last_read_at", nullable = false)
+    private LocalDateTime user1LastReadAt;
+
+    @Column(name = "user2_last_read_at", nullable = false)
+    private LocalDateTime user2LastReadAt;
 }

@@ -14,6 +14,14 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
     List<Message> findByChannelIdAndCreatedAtBeforeOrderByCreatedAtDesc(UUID channelId, LocalDateTime before, Pageable pageable);
     List<Message> findByDirectMessageIdAndCreatedAtBeforeOrderByCreatedAtDesc(UUID dmId, LocalDateTime before, Pageable pageable);
 
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.directMessage.id = :dmId " +
+            "AND m.sender.id <> :userId AND m.createdAt > :lastReadAt")
+    long countUnreadDmMessages(
+            @Param("dmId") UUID dmId,
+            @Param("userId") UUID userId,
+            @Param("lastReadAt") LocalDateTime lastReadAt
+    );
+
     @Modifying
     @Query("DELETE FROM Message m WHERE m.channel.id IN :channelIds")
     void deleteByChannelIds(@Param("channelIds") List<UUID> channelIds);

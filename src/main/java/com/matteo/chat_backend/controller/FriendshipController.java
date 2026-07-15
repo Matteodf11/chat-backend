@@ -60,4 +60,12 @@ public class FriendshipController {
     public ResponseEntity<List<DmResponse>> getMyDms(Principal principal) {
         return ResponseEntity.ok(friendshipService.getMyDms(principal.getName()));
     }
+
+    @PutMapping("/dm/{dmId}/read")
+    public ResponseEntity<Void> markDmRead(
+            @PathVariable UUID dmId,
+            Principal principal) {
+        friendshipService.markDmRead(dmId, principal.getName());
+        return ResponseEntity.noContent().build();
+    }
 }
