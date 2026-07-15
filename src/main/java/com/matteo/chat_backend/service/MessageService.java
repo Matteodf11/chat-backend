@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.ArrayList;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -102,6 +103,74 @@ public class MessageService {
                 dmId, cursor(before), PageRequest.of(0, normalizedLimit(limit) + 1)), normalizedLimit(limit));
     }
 
+    public List<MessageResponse> searchChannelMessages(
+            UUID channelId,
+            String query,
+            String sender,
+            LocalDateTime from,
+            LocalDateTime to,
+            boolean attachmentsOnly,
+            int limit,
+            String requesterEmail
+    ) {
+        authorizationService.requireChannelAccess(channelId, requesterEmail);
+        validateAndRateLimitSearch(query, sender, from, to, attachmentsOnly, requesterEmail);
+        return searchMessages(
+                messageRepository.findByChannelIdAndCreatedAtBeforeOrderByCreatedAtDesc(
+                        channelId, cursor(null), PageRequest.of(0, 1000)),
+                query, sender, from, to, attachmentsOnly, limit, requesterEmail
+        );
+    }
+
+    public List<MessageResponse> searchDmMessages(
+            UUID dmId,
+            String query,
+            String sender,
+            LocalDateTime from,
+            LocalDateTime to,
+            boolean attachmentsOnly,
+            int limit,
+            String requesterEmail
+    ) {
+        authorizationService.requireDirectMessageAccess(dmId, requesterEmail);
+        validateAndRateLimitSearch(query, sender, from, to, attachmentsOnly, requesterEmail);
+        return searchMessages(
+                messageRepository.findByDirectMessageIdAndCreatedAtBeforeOrderByCreatedAtDesc(
+                        dmId, cursor(null), PageRequest.of(0, 1000)),
+                query, sender, from, to, attachmentsOnly, limit, requesterEmail
+        );
+    }
+
+    public MessagePageResponse getMessageContext(UUID messageId, String requesterEmail) {
+        Message center = messageRepository.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Mensaje no encontrado"));
+        UUID channelId = center.getChannel() != null ? center.getChannel().getId() : null;
+        UUID dmId = center.getDirectMessage() != null ? center.getDirectMessage().getId() : null;
+        if (channelId != null) authorizationService.requireChannelAccess(channelId, requesterEmail);
+        else authorizationService.requireDirectMessageAccess(dmId, requesterEmail);
+
+        int sideSize = 25;
+        List<Message> older = channelId != null
+                ? messageRepository.findByChannelIdAndCreatedAtBeforeOrderByCreatedAtDesc(
+                        channelId, center.getCreatedAt(), PageRequest.of(0, sideSize + 1))
+                : messageRepository.findByDirectMessageIdAndCreatedAtBeforeOrderByCreatedAtDesc(
+                        dmId, center.getCreatedAt(), PageRequest.of(0, sideSize + 1));
+        boolean hasOlder = older.size() > sideSize;
+        older = new ArrayList<>(older.subList(0, Math.min(sideSize, older.size())));
+        java.util.Collections.reverse(older);
+
+        List<Message> newer = channelId != null
+                ? messageRepository.findByChannelIdAndCreatedAtAfterOrderByCreatedAtAsc(
+                        channelId, center.getCreatedAt(), PageRequest.of(0, sideSize))
+                : messageRepository.findByDirectMessageIdAndCreatedAtAfterOrderByCreatedAtAsc(
+                        dmId, center.getCreatedAt(), PageRequest.of(0, sideSize));
+        List<MessageResponse> context = new ArrayList<>();
+        older.stream().map(this::toResponse).forEach(context::add);
+        context.add(toResponse(center));
+        newer.stream().map(this::toResponse).forEach(context::add);
+        return new MessagePageResponse(context, hasOlder);
+    }
+
     @Transactional
     public MessageResponse editMessage(UUID messageId, String content, String requesterEmail) {
         Message message = requireOwnedMessage(messageId, requesterEmail);
@@ -159,6 +228,66 @@ public class MessageService {
                 attachmentStorageService.createSignedUrl(message.getAttachmentKey()),
                 message.getCreatedAt()
         );
+    }
+
+    private List<MessageResponse> searchMessages(
+            List<Message> candidates,
+            String query,
+            String sender,
+            LocalDateTime from,
+            LocalDateTime to,
+            boolean attachmentsOnly,
+            int limit,
+            String requesterEmail
+    ) {
+        String cleanQuery = normalizeSearchText(query, 120);
+        String cleanSender = normalizeSearchText(sender, 80);
+        int resultLimit = Math.max(1, Math.min(limit, 50));
+        return candidates.stream()
+                .filter(message -> from == null || !message.getCreatedAt().isBefore(from))
+                .filter(message -> to == null || !message.getCreatedAt().isAfter(to))
+                .filter(message -> !attachmentsOnly || message.getAttachmentKey() != null)
+                .filter(message -> cleanSender.isBlank()
+                        || message.getSender().getUsername().toLowerCase(Locale.ROOT).contains(cleanSender))
+                .filter(message -> {
+                    if (cleanQuery.isBlank()) return true;
+                    String content = cryptoService.decrypt(message.getContent()).toLowerCase(Locale.ROOT);
+                    String attachmentName = message.getAttachmentName() == null
+                            ? "" : message.getAttachmentName().toLowerCase(Locale.ROOT);
+                    return content.contains(cleanQuery) || attachmentName.contains(cleanQuery);
+                })
+                .limit(resultLimit)
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private void validateAndRateLimitSearch(
+            String query,
+            String sender,
+            LocalDateTime from,
+            LocalDateTime to,
+            boolean attachmentsOnly,
+            String requesterEmail
+    ) {
+        String cleanQuery = normalizeSearchText(query, 120);
+        String cleanSender = normalizeSearchText(sender, 80);
+        if (cleanQuery.isBlank() && cleanSender.isBlank() && from == null && to == null && !attachmentsOnly) {
+            throw new IllegalArgumentException("Indica texto, autor, fechas o el filtro de archivos");
+        }
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("La fecha inicial no puede ser posterior a la final");
+        }
+        rateLimiter.requireCapacity("message-search:" + requesterEmail, 12, Duration.ofMinutes(1),
+                "Demasiadas busquedas, espera un momento");
+    }
+
+    private String normalizeSearchText(String value, int maxLength) {
+        if (value == null) return "";
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException("El filtro de busqueda es demasiado largo");
+        }
+        return normalized;
     }
 
     private void requireSameDestination(Message message, Message replyTo) {

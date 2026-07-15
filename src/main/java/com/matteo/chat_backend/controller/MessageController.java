@@ -10,9 +10,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -66,6 +70,41 @@ public class MessageController {
         return ResponseEntity.ok(messageService.getDmMessages(dmId, before, limit, principal.getName()));
     }
 
+    @GetMapping("/channel/{channelId}/search")
+    public ResponseEntity<List<MessageResponse>> searchChannelMessages(
+            @PathVariable UUID channelId,
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "") String sender,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "false") boolean attachmentsOnly,
+            @RequestParam(defaultValue = "50") int limit,
+            Principal principal) {
+        return ResponseEntity.ok(messageService.searchChannelMessages(
+                channelId, q, sender, startOfDay(from), endOfDay(to), attachmentsOnly, limit, principal.getName()));
+    }
+
+    @GetMapping("/dm/{dmId}/search")
+    public ResponseEntity<List<MessageResponse>> searchDmMessages(
+            @PathVariable UUID dmId,
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(defaultValue = "") String sender,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "false") boolean attachmentsOnly,
+            @RequestParam(defaultValue = "50") int limit,
+            Principal principal) {
+        return ResponseEntity.ok(messageService.searchDmMessages(
+                dmId, q, sender, startOfDay(from), endOfDay(to), attachmentsOnly, limit, principal.getName()));
+    }
+
+    @GetMapping("/context/{messageId}")
+    public ResponseEntity<MessagePageResponse> getMessageContext(
+            @PathVariable UUID messageId,
+            Principal principal) {
+        return ResponseEntity.ok(messageService.getMessageContext(messageId, principal.getName()));
+    }
+
     @PostMapping("/dm/{dmId}")
     public ResponseEntity<MessageResponse> sendDmMessage(
             @PathVariable UUID dmId,
@@ -115,6 +154,14 @@ public class MessageController {
         request.setChannelId(channelId);
         request.setDmId(dmId);
         return request;
+    }
+
+    private LocalDateTime startOfDay(LocalDate value) {
+        return value == null ? null : value.atStartOfDay();
+    }
+
+    private LocalDateTime endOfDay(LocalDate value) {
+        return value == null ? null : value.atTime(LocalTime.MAX);
     }
 
     private void publishDmMessage(MessageResponse response, String requesterEmail) {
