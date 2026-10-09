@@ -112,10 +112,8 @@ public class AttachmentStorageService {
     }
 
     private HttpRequest.Builder authorizedRequest(String path) {
-        return HttpRequest.newBuilder()
-                .uri(URI.create(normalizedUrl() + path))
-                .header("Authorization", "Bearer " + serviceRoleKey)
-                .header("apikey", serviceRoleKey);
+        return SupabaseRequestHeaders.authorize(HttpRequest.newBuilder()
+                .uri(URI.create(normalizedUrl() + path)), serviceRoleKey);
     }
 
     private void validateSignature(byte[] bytes, String contentType) {

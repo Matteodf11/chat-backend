@@ -11,7 +11,7 @@ spring:
     password: ${DB_PASSWORD:${SPRING_DATASOURCE_PASSWORD}}
   flyway:
     enabled: true
-    baseline-on-migrate: true
+    baseline-on-migrate: false
     baseline-version: 2
     locations: classpath:db/migration/common,classpath:db/migration/{vendor}
   jpa:

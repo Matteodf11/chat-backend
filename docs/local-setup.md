@@ -43,10 +43,22 @@ Run the backend:
 Before starting, export JWT_SECRET and MESSAGE_ENCRYPTION_KEY into the process
 environment. The Maven wrapper does not automatically load a .env file.
 Use the existing encryption key if the database already contains encrypted messages.
-Ignored application.properties/application-local.properties may also override YAML;
-review these local files without committing their credentials.
+Private application.properties/application-local.properties are preserved on disk
+but excluded from Maven resources: they must not leak into the JAR or override
+YAML. Supply credentials via process environment. For IDE launches, also check
+the IDE does not copy these private files into its own runtime classpath.
 
-The checked-in Flyway history does not yet create all core tables in a fresh
-database. It requires an existing compatible schema; do not assume the commands
-above provision a working empty database. See restart-audit-2026-10-09.md before
-changing or deploying migrations.
+An empty PostgreSQL database is provisioned by B14__complete_chat_schema.sql.
+Existing databases with Flyway history continue using the original V migrations.
+Non-empty databases without Flyway history are intentionally rejected: do not
+enable baseline-on-migrate or use baseline/repair without inspecting the actual
+schema and taking a verified backup. See postgres-migrations.md.
+
+Run all tests (no Docker, Supabase account or production credentials required):
+
+```powershell
+.\mvnw.cmd verify
+```
+
+The first run downloads test-only PostgreSQL 18.3 binaries. Tests start a temporary
+loopback-only instance on a random port and shut it down afterwards.

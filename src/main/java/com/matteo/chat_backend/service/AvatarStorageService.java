@@ -134,10 +134,8 @@ public class AvatarStorageService {
 
     private void uploadObject(String objectPath, byte[] bytes, String contentType) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(normalizedSupabaseUrl() + "/storage/v1/object/" + avatarBucket + "/" + encodeObjectPath(objectPath)))
-                    .header("Authorization", "Bearer " + serviceRoleKey)
-                    .header("apikey", serviceRoleKey)
+            HttpRequest request = SupabaseRequestHeaders.authorize(HttpRequest.newBuilder()
+                    .uri(URI.create(normalizedSupabaseUrl() + "/storage/v1/object/" + avatarBucket + "/" + encodeObjectPath(objectPath))), serviceRoleKey)
                     .header("Content-Type", contentType)
                     .header("x-upsert", "true")
                     .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes))
@@ -156,10 +154,8 @@ public class AvatarStorageService {
     private AvatarFile downloadObject(String objectPath, String extension) {
         validateConfiguration();
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(normalizedSupabaseUrl() + "/storage/v1/object/" + avatarBucket + "/" + encodeObjectPath(objectPath)))
-                    .header("Authorization", "Bearer " + serviceRoleKey)
-                    .header("apikey", serviceRoleKey)
+            HttpRequest request = SupabaseRequestHeaders.authorize(HttpRequest.newBuilder()
+                    .uri(URI.create(normalizedSupabaseUrl() + "/storage/v1/object/" + avatarBucket + "/" + encodeObjectPath(objectPath))), serviceRoleKey)
                     .GET()
                     .build();
             HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());

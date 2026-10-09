@@ -1,5 +1,24 @@
 # Retoma del proyecto: 9 de octubre de 2026
 
+## Seguimiento de prioridades
+
+Se ha añadido B14 como esquema acumulado completo para instalaciones vacías,
+sin editar V1-V14. Pruebas con PostgreSQL 18.3 real verifican instalación nueva,
+actualización desde un modelo histórico a V13 y después V14, conservación de
+mensajes, equivalencia de columnas y restricciones RLS/roles de API. Las bases
+no vacías sin historial se rechazan; baseline-on-migrate queda desactivado.
+La fixture histórica no es un volcado de Supabase: queda pendiente comprobar el
+esquema real antes de desplegar. Ver postgres-migrations.md.
+
+El cliente de almacenamiento admite las nuevas claves secretas de Supabase,
+además de las service_role antiguas. Los dos .properties privados se excluyen
+del JAR y JWT_SECRET se declara explícitamente en YAML. Se añade CI de pruebas.
+No se ha hecho push, despliegue, rotación ni modificación de la base remota.
+La rotación está documentada en credential-rotation.md. El usuario confirma que
+los datos actuales son de pruebas y pueden descartarse; no ha sido necesario.
+
+El resto del documento conserva los hallazgos y resultados de la revisión inicial.
+
 ## Cambios encontrados y conservados
 
 Git mostraba 32 archivos modificados y 10 nuevos. Incluían cambios de otra IA:
