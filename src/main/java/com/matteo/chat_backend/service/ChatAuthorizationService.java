@@ -55,7 +55,8 @@ public class ChatAuthorizationService {
         }
         if (destination.equals("/topic/presence") || destination.equals("/topic/profile")
                 || destination.equals("/user/queue/messages") || destination.equals("/user/queue/friends")
-                || destination.equals("/user/queue/server-events")) {
+                || destination.equals("/user/queue/server-events") || destination.equals("/user/queue/read-receipts")
+                || destination.equals("/user/queue/dm-settings")) {
             return;
         }
         UUID channelId = destinationId(destination, "/topic/channel.", "/topic/typing.channel.");

@@ -27,6 +27,8 @@ import java.util.Locale;
 public class MessageService {
 
     private final MessageRepository messageRepository;
+    private final com.matteo.chat_backend.repository.UserRepository userRepository;
+    private final com.matteo.chat_backend.repository.DirectMessageRepository directMessageRepository;
     private final ChatAuthorizationService authorizationService;
     private final MessageCryptoService cryptoService;
     private final RequestRateLimiter rateLimiter;
@@ -52,6 +54,7 @@ public class MessageService {
 
         Message message = new Message();
         message.setSender(sender);
+        message.setClientMessageId(request.getClientMessageId());
         String content = request.getContent() == null ? "" : request.getContent().trim();
         if (content.length() > 4000) {
             throw new IllegalArgumentException("El mensaje no puede superar 4000 caracteres");
@@ -66,6 +69,20 @@ public class MessageService {
         } else {
             DirectMessage directMessage = authorizationService.requireDirectMessageAccess(request.getDmId(), senderEmail);
             message.setDirectMessage(directMessage);
+        }
+
+        if (request.getClientMessageId() != null) {
+            // Serialize retries for one sender, including concurrent requests on different instances.
+            userRepository.lockActiveById(sender.getId()).orElseThrow();
+            var previous = messageRepository.findBySenderIdAndClientMessageId(sender.getId(), request.getClientMessageId());
+            if (previous.isPresent()) {
+                Message existing = previous.get();
+                requireSameDestination(message, existing);
+                if (existing.getDeletedAt() != null) {
+                    throw new IllegalArgumentException("Este mensaje ya fue eliminado");
+                }
+                return toResponse(existing);
+            }
         }
 
         if (request.getReplyToId() != null) {
@@ -84,7 +101,11 @@ public class MessageService {
                 message.setAttachmentContentType(attachment.contentType());
                 message.setAttachmentSize(attachment.size());
             }
-            return toResponse(messageRepository.save(message));
+            Message saved = messageRepository.save(message);
+            if (saved.getDirectMessage() != null) {
+                directMessageRepository.recordActivity(saved.getDirectMessage().getId(), saved.getCreatedAt());
+            }
+            return toResponse(saved);
         } catch (RuntimeException exception) {
             if (attachment != null) attachmentStorageService.delete(attachment.key());
             throw exception;
@@ -227,8 +248,47 @@ public class MessageService {
                 message.getAttachmentContentType(),
                 message.getAttachmentSize(),
                 attachmentStorageService.createSignedUrl(message.getAttachmentKey()),
-                message.getCreatedAt()
+                message.getCreatedAt(),
+                message.getClientMessageId(),
+                recipientReadAt(message)
         );
+    }
+
+    public com.matteo.chat_backend.dto.SharedItemsResponse getSharedItems(UUID dmId, String kind, UUID before, String email) {
+        authorizationService.requireDirectMessageAccess(dmId, email);
+        if (!List.of("media", "files", "links").contains(kind)) throw new IllegalArgumentException("Tipo no válido");
+        LocalDateTime at = cursor(null);
+        UUID id = new UUID(-1L, -1L);
+        if (before != null) {
+            var anchor = messageRepository.findById(before).orElseThrow(() -> new IllegalArgumentException("Cursor no disponible"));
+            if (anchor.getDirectMessage() == null || !anchor.getDirectMessage().getId().equals(dmId)) {
+                throw new IllegalArgumentException("Cursor no válido para esta conversación");
+            }
+            at = anchor.getCreatedAt();
+            id = anchor.getId();
+        }
+        var candidates = messageRepository.findSharedCandidates(dmId, at, id, PageRequest.of(0, 101));
+        var scanned = candidates.subList(0, Math.min(100, candidates.size()));
+        var links = java.util.regex.Pattern.compile("https?://[^\\s<>]+", java.util.regex.Pattern.CASE_INSENSITIVE);
+        var result = scanned.stream().filter(m -> {
+            String type = m.getAttachmentContentType();
+            boolean media = type != null && (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/"));
+            return switch (kind) {
+                case "media" -> m.getAttachmentName() != null && media;
+                case "files" -> m.getAttachmentName() != null && !media;
+                default -> links.matcher(cryptoService.decrypt(m.getContent())).find();
+            };
+        }).map(this::toResponse).toList();
+        return new com.matteo.chat_backend.dto.SharedItemsResponse(result, candidates.size() > 100,
+                scanned.isEmpty() ? null : scanned.getLast().getId());
+    }
+
+    private LocalDateTime recipientReadAt(Message message) {
+        var dm = message.getDirectMessage();
+        if (dm == null || message.getCreatedAt() == null) return null;
+        var readAt = dm.getUser1().getId().equals(message.getSender().getId())
+                ? dm.getUser2LastReadAt() : dm.getUser1LastReadAt();
+        return readAt != null && !readAt.isBefore(message.getCreatedAt()) ? readAt : null;
     }
 
     private List<MessageResponse> searchMessages(

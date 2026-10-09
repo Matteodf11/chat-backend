@@ -8,6 +8,7 @@ import com.matteo.chat_backend.entity.AuthSession;
 import com.matteo.chat_backend.entity.User;
 import com.matteo.chat_backend.exception.ConflictException;
 import com.matteo.chat_backend.exception.UnauthorizedException;
+import com.matteo.chat_backend.exception.ValidationException;
 import com.matteo.chat_backend.repository.AuthSessionRepository;
 import com.matteo.chat_backend.repository.UserRepository;
 import com.matteo.chat_backend.security.JwtService;
@@ -16,6 +17,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -31,6 +33,9 @@ import java.util.HexFormat;
 public class AuthService {
 
     private static final int REFRESH_TOKEN_BYTES = 32;
+
+    @Value("${security.sessions.remembered-days:90}")
+    private long rememberedSessionDays;
 
     private final UserRepository userRepository;
     private final AuthSessionRepository authSessionRepository;
@@ -52,7 +57,7 @@ public class AuthService {
         user.setTokenVersion(0);
         user.setCreatedAt(LocalDateTime.now());
         userRepository.save(user);
-        return createSession(user, false, "Registro");
+        return createSession(user, true, "Registro");
     }
 
     @Transactional
@@ -76,6 +81,9 @@ public class AuthService {
         String rotatedToken = randomToken();
         session.setTokenHash(hash(rotatedToken));
         session.setLastUsedAt(now);
+        if (session.getPersistent()) {
+            session.setExpiresAt(now.plusDays(rememberedSessionDays));
+        }
         authSessionRepository.save(session);
         return response(session.getUser(), rotatedToken);
     }
@@ -92,7 +100,7 @@ public class AuthService {
     public void changePassword(ChangePasswordRequest request, String email) {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new UnauthorizedException("Usuario no autorizado"));
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-            throw new UnauthorizedException("La contraseña actual no es correcta");
+            throw new ValidationException("La contraseña actual no es correcta");
         }
         if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
             throw new IllegalArgumentException("La nueva contraseña debe ser diferente");
@@ -113,7 +121,7 @@ public class AuthService {
         session.setPersistent(persistent);
         session.setCreatedAt(now);
         session.setLastUsedAt(now);
-        session.setExpiresAt(now.plusDays(persistent ? 30 : 1));
+        session.setExpiresAt(now.plusDays(persistent ? rememberedSessionDays : 1));
         authSessionRepository.save(session);
         return response(user, refreshToken);
     }

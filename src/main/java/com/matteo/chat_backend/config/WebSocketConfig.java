@@ -26,12 +26,24 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final ChatAuthorizationService chatAuthorizationService;
+    private final org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler chatHeartbeatScheduler;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic", "/queue");
+        registry.enableSimpleBroker("/topic", "/queue")
+                .setTaskScheduler(chatHeartbeatScheduler)
+                .setHeartbeatValue(new long[]{10000, 10000});
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
+    }
+
+    @org.springframework.context.annotation.Bean
+    public static org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler chatHeartbeatScheduler() {
+        var scheduler = new org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("chat-heartbeat-");
+        scheduler.setRemoveOnCancelPolicy(true);
+        return scheduler;
     }
 
     @Override

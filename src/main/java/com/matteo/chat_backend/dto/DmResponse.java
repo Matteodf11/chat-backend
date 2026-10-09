@@ -15,4 +15,11 @@ public class DmResponse {
     private Boolean otherIsOnline;
     private Boolean hasUnread;
     private LocalDateTime createdAt;
+    private long unreadCount;
+    private String lastMessagePreview;
+    private LocalDateTime lastMessageAt;
+    private LocalDateTime lastActivityAt;
+    private boolean pinned;
+    private boolean muted;
+    private boolean archived;
 }

@@ -40,6 +40,8 @@ class MessageServiceSearchTest {
     void setUp() {
         service = new MessageService(
                 messageRepository,
+                org.mockito.Mockito.mock(com.matteo.chat_backend.repository.UserRepository.class),
+                org.mockito.Mockito.mock(com.matteo.chat_backend.repository.DirectMessageRepository.class),
                 authorizationService,
                 cryptoService,
                 rateLimiter,

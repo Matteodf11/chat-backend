@@ -12,6 +12,11 @@ import java.util.UUID;
 import java.time.LocalDateTime;
 
 public interface MessageRepository extends JpaRepository<Message, UUID> {
+    @Query("SELECT m FROM Message m WHERE m.directMessage.id = :dmId AND m.deletedAt IS NULL " +
+            "AND (m.createdAt < :at OR (m.createdAt = :at AND m.id < :id)) ORDER BY m.createdAt DESC, m.id DESC")
+    List<Message> findSharedCandidates(UUID dmId, LocalDateTime at, UUID id, Pageable pageable);
+    Optional<Message> findBySenderIdAndClientMessageId(UUID senderId, UUID clientMessageId);
+
     @Query("SELECT m FROM Message m WHERE m.channel.id = :channelId AND m.deletedAt IS NULL AND m.createdAt < :before ORDER BY m.createdAt DESC")
     List<Message> findByChannelIdAndCreatedAtBeforeOrderByCreatedAtDesc(UUID channelId, LocalDateTime before, Pageable pageable);
 

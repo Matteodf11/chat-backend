@@ -54,8 +54,8 @@ class PostgresMigrationTests {
         var jdbc = new JdbcTemplate(dataSource);
         jdbc.execute("ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated");
         var flyway = flyway(dataSource);
-        assertEquals(1, flyway.migrate().migrationsExecuted);
-        assertEquals("B14__complete_chat_schema.sql", flyway.info().current().getScript());
+        assertEquals(4, flyway.migrate().migrationsExecuted);
+        assertEquals("V17__conversation_preferences_and_activity.sql", flyway.info().current().getScript());
         validateEntities(dataSource);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         assertApiRolesRestricted(jdbc);
@@ -70,6 +70,7 @@ class PostgresMigrationTests {
             user.setUsername("postgres-smoke");
             user.setEmail("postgres-smoke@example.invalid");
             user.setPasswordHash("test-only-hash");
+            user.setBio("Migration biography");
             session.persist(user);
             var server = new Server();
             server.setName("Migration smoke");
@@ -86,12 +87,13 @@ class PostgresMigrationTests {
             session.persist(message);
             transaction.commit();
             session.clear();
+            assertEquals("Migration biography", session.find(User.class, user.getId()).getBio());
             assertEquals(message.getContent(), session.find(Message.class, message.getId()).getContent());
         }
     }
 
     @Test
-    void legacyHistoryUpgradesThroughV14WithoutLosingMessages() throws Exception {
+    void legacyHistoryUpgradesThroughV17WithoutLosingMessages() throws Exception {
         var dataSource = newDatabase();
         try (var connection = dataSource.getConnection()) {
             ScriptUtils.executeSqlScript(connection,
@@ -113,10 +115,20 @@ class PostgresMigrationTests {
         oldVersion.baseline(); // Explicit adoption of this known fixture, never automatic adoption.
         oldVersion.migrate();
         assertEquals("13", oldVersion.info().current().getVersion().getVersion());
+        var dmId = UUID.randomUUID();
+        var emptyDmId = UUID.randomUUID();
+        jdbc.update("INSERT INTO direct_messages(id, user1_id, user2_id, created_at) VALUES (?, ?, ?, TIMESTAMP '2026-10-01 10:00:00')", dmId, userId, userId);
+        jdbc.update("INSERT INTO direct_messages(id, user1_id, user2_id, created_at) VALUES (?, ?, ?, TIMESTAMP '2026-10-02 10:00:00')", emptyDmId, userId, userId);
+        jdbc.update("UPDATE messages SET dm_id = ?, created_at = TIMESTAMP '2026-10-09 12:00:00' WHERE id = ?", dmId, messageId);
         var flyway = flyway(dataSource);
-        assertEquals(1, flyway.migrate().migrationsExecuted);
+        assertEquals(4, flyway.migrate().migrationsExecuted);
         flyway.validate();
-        assertEquals("V14__add_soft_delete_deleted_at.sql", flyway.info().current().getScript());
+        assertEquals("V17__conversation_preferences_and_activity.sql", flyway.info().current().getScript());
+        assertEquals(java.time.LocalDateTime.of(2026, 10, 9, 12, 0), jdbc.queryForObject(
+                "SELECT last_activity_at FROM direct_messages WHERE id = ?", java.sql.Timestamp.class, dmId).toLocalDateTime());
+        assertEquals(java.time.LocalDateTime.of(2026, 10, 2, 10, 0), jdbc.queryForObject(
+                "SELECT last_activity_at FROM direct_messages WHERE id = ?", java.sql.Timestamp.class, emptyDmId).toLocalDateTime());
+        assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT user1_pinned OR user1_muted OR user1_archived OR user2_pinned OR user2_muted OR user2_archived FROM direct_messages WHERE id = ?", Boolean.class, dmId));
         assertEquals("preserved encrypted payload", jdbc.queryForObject("SELECT content FROM messages WHERE id = ?", String.class, messageId));
         assertEquals("owner", jdbc.queryForObject("SELECT role FROM server_members", String.class));
         assertEquals(0, jdbc.queryForObject("SELECT token_version FROM users", Integer.class));

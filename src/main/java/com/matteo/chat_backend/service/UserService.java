@@ -65,6 +65,10 @@ public class UserService {
             user.setStatus(request.getStatus());
         }
 
+        if (request.getBio() != null) {
+            user.setBio(request.getBio().strip());
+        }
+
         if (request.getProfileColor() != null && !request.getProfileColor().isBlank()) {
             user.setProfileColor(request.getProfileColor());
         }
@@ -148,14 +152,15 @@ public class UserService {
                 user.getProfileColor(),
                 presenceService.isOnline(user),
                 user.getLastSeen(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                user.getBio()
         );
     }
 
     private void publishProfileEvent(User user) {
         messagingTemplate.convertAndSend(
                 "/topic/profile",
-                new ProfileEvent(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getProfileBannerUrl(), user.getStatus(), user.getProfileColor())
+                new ProfileEvent(user.getId(), user.getUsername(), user.getAvatarUrl(), user.getProfileBannerUrl(), user.getStatus(), user.getProfileColor(), user.getBio())
         );
     }
 }

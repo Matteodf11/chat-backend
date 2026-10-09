@@ -47,7 +47,8 @@ class FriendshipServiceTest {
                 directMessageRepository,
                 messageRepository,
                 messagingTemplate,
-                presenceService
+                presenceService,
+                org.mockito.Mockito.mock(MessageCryptoService.class)
         );
         user1 = user("one@example.com");
         user2 = user("two@example.com");
@@ -76,7 +77,7 @@ class FriendshipServiceTest {
     void markingReadUpdatesOnlyCurrentParticipant() {
         LocalDateTime previousUser2Read = dm.getUser2LastReadAt();
         when(userRepository.findByEmail(user1.getEmail())).thenReturn(Optional.of(user1));
-        when(directMessageRepository.findActiveById(dm.getId())).thenReturn(Optional.of(dm));
+        when(directMessageRepository.lockActiveById(dm.getId())).thenReturn(Optional.of(dm));
 
         service.markDmRead(dm.getId(), user1.getEmail());
 

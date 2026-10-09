@@ -18,4 +18,5 @@ public class UserProfileResponse {
     private Boolean isOnline;
     private LocalDateTime lastSeen;
     private LocalDateTime createdAt;
+    private String bio;
 }

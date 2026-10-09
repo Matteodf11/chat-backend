@@ -16,6 +16,9 @@ public class UpdateProfileRequest {
     @Size(max = 100)
     private String status;
 
+    @Size(max = 300)
+    private String bio;
+
     @Size(max = 20)
     private String profileColor;
 }

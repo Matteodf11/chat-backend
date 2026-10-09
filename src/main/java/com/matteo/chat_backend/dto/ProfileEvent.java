@@ -14,4 +14,5 @@ public class ProfileEvent {
     private String profileBannerUrl;
     private String status;
     private String profileColor;
+    private String bio;
 }

@@ -75,8 +75,15 @@ public class FriendshipController {
     @PutMapping("/dm/{dmId}/read")
     public ResponseEntity<Void> markDmRead(
             @PathVariable UUID dmId,
+            @RequestParam(required = false) UUID upToMessageId,
             Principal principal) {
-        friendshipService.markDmRead(dmId, principal.getName());
+        friendshipService.markDmRead(dmId, principal.getName(), upToMessageId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/dm/{dmId}/preferences")
+    public ResponseEntity<DmResponse> updateDmPreferences(@PathVariable UUID dmId,
+            @RequestBody com.matteo.chat_backend.dto.DmPreferencesRequest request, Principal principal) {
+        return ResponseEntity.ok(friendshipService.updateDmPreferences(dmId, principal.getName(), request));
     }
 }

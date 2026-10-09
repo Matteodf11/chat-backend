@@ -11,4 +11,5 @@ public class MessageRequest {
     private UUID channelId;
     private UUID dmId;
     private UUID replyToId;
+    private UUID clientMessageId;
 }

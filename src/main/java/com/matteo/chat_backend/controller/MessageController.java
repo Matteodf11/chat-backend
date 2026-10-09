@@ -54,8 +54,10 @@ public class MessageController {
             @RequestPart("file") MultipartFile file,
             @RequestParam(defaultValue = "") String content,
             @RequestParam(required = false) UUID replyToId,
+            @RequestParam(required = false) UUID clientMessageId,
             Principal principal) {
         MessageRequest request = attachmentRequest(content, replyToId, channelId, null);
+        request.setClientMessageId(clientMessageId);
         MessageResponse response = messageService.saveAttachmentMessage(request, file, principal.getName());
         messagingTemplate.convertAndSend("/topic/channel." + channelId, response);
         return ResponseEntity.ok(response);
@@ -68,6 +70,12 @@ public class MessageController {
             @RequestParam(defaultValue = "50") int limit,
             Principal principal) {
         return ResponseEntity.ok(messageService.getDmMessages(dmId, before, limit, principal.getName()));
+    }
+
+    @GetMapping("/dm/{dmId}/shared")
+    public com.matteo.chat_backend.dto.SharedItemsResponse sharedItems(@PathVariable UUID dmId,
+            @RequestParam(defaultValue = "media") String kind, @RequestParam(required = false) UUID before, Principal principal) {
+        return messageService.getSharedItems(dmId, kind, before, principal.getName());
     }
 
     @GetMapping("/channel/{channelId}/search")
@@ -123,8 +131,10 @@ public class MessageController {
             @RequestPart("file") MultipartFile file,
             @RequestParam(defaultValue = "") String content,
             @RequestParam(required = false) UUID replyToId,
+            @RequestParam(required = false) UUID clientMessageId,
             Principal principal) {
         MessageRequest request = attachmentRequest(content, replyToId, null, dmId);
+        request.setClientMessageId(clientMessageId);
         MessageResponse response = messageService.saveAttachmentMessage(request, file, principal.getName());
         publishDmMessage(response, principal.getName());
         return ResponseEntity.ok(response);

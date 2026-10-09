@@ -6,13 +6,16 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "messages")
+@Table(name = "messages", uniqueConstraints = @UniqueConstraint(name = "uq_messages_sender_client_id", columnNames = {"sender_id", "client_message_id"}))
 @Data
 public class Message {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Column(name = "client_message_id")
+    private UUID clientMessageId;
 
     @ManyToOne
     @JoinColumn(name = "sender_id", nullable = false)
@@ -52,4 +55,9 @@ public class Message {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    @PrePersist
+    private void normalizeTimestamp() {
+        if (createdAt != null) createdAt = createdAt.truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+    }
 }

@@ -31,6 +31,9 @@ public class User {
 
     private String status;
 
+    @Column(length = 300)
+    private String bio;
+
     @Column(name = "profile_color", length = 20)
     private String profileColor = "#7C5CFF";
 

@@ -25,4 +25,6 @@ public class MessageResponse {
     private Long attachmentSize;
     private String attachmentUrl;
     private LocalDateTime createdAt;
+    private UUID clientMessageId;
+    private LocalDateTime readAt;
 }
