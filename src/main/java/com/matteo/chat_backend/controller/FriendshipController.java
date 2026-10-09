@@ -19,6 +19,16 @@ import java.util.UUID;
 public class FriendshipController {
 
     private final FriendshipService friendshipService;
+    private final com.matteo.chat_backend.service.UserSafetyService safety;
+
+    @GetMapping("/blocked")
+    public java.util.List<com.matteo.chat_backend.dto.BlockedUserResponse> blocked(Principal principal) { return safety.blockedUsers(principal.getName()); }
+    @PutMapping("/block/{userId}")
+    public ResponseEntity<Void> block(@PathVariable UUID userId, Principal principal) { safety.block(userId, principal.getName()); return ResponseEntity.noContent().build(); }
+    @DeleteMapping("/block/{userId}")
+    public ResponseEntity<Void> unblock(@PathVariable UUID userId, Principal principal) { safety.unblock(userId, principal.getName()); return ResponseEntity.noContent().build(); }
+    @DeleteMapping("/user/{userId}")
+    public ResponseEntity<Void> removeFriend(@PathVariable UUID userId, Principal principal) { safety.removeFriend(userId, principal.getName()); return ResponseEntity.noContent().build(); }
 
     @PostMapping("/request/{receiverId}")
     public ResponseEntity<FriendshipResponse> sendRequest(

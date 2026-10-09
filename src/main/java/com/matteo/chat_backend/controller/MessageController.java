@@ -106,6 +106,11 @@ public class MessageController {
                 dmId, q, sender, startOfDay(from), endOfDay(to), attachmentsOnly, limit, principal.getName()));
     }
 
+    @GetMapping("/{messageId}")
+    public MessageResponse getMessage(@PathVariable UUID messageId, Principal principal) {
+        return messageService.getMessage(messageId, principal.getName());
+    }
+
     @GetMapping("/context/{messageId}")
     public ResponseEntity<MessagePageResponse> getMessageContext(
             @PathVariable UUID messageId,

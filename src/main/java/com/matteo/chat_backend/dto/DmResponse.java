@@ -22,4 +22,5 @@ public class DmResponse {
     private boolean pinned;
     private boolean muted;
     private boolean archived;
+    private boolean canMessage;
 }

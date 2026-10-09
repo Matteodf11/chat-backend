@@ -48,7 +48,7 @@ class FriendshipServiceTest {
                 messageRepository,
                 messagingTemplate,
                 presenceService,
-                org.mockito.Mockito.mock(MessageCryptoService.class)
+                org.mockito.Mockito.mock(MessageCryptoService.class), org.mockito.Mockito.mock(UserSafetyService.class)
         );
         user1 = user("one@example.com");
         user2 = user("two@example.com");

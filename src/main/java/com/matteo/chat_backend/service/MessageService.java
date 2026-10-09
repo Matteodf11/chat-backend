@@ -71,6 +71,12 @@ public class MessageService {
             message.setDirectMessage(directMessage);
         }
 
+        if (message.getDirectMessage() != null) {
+            // Serialize sends with blocking even when an old client omits the retry identifier.
+            userRepository.lockActiveById(sender.getId()).orElseThrow();
+            authorizationService.requireDirectMessageSendAccess(request.getDmId(), senderEmail);
+        }
+
         if (request.getClientMessageId() != null) {
             // Serialize retries for one sender, including concurrent requests on different instances.
             userRepository.lockActiveById(sender.getId()).orElseThrow();
@@ -162,6 +168,14 @@ public class MessageService {
         );
     }
 
+    public MessageResponse getMessage(UUID messageId, String requesterEmail) {
+        Message message = messageRepository.findActiveById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("Mensaje no encontrado"));
+        if (message.getChannel() != null) authorizationService.requireChannelAccess(message.getChannel().getId(), requesterEmail);
+        else authorizationService.requireDirectMessageAccess(message.getDirectMessage().getId(), requesterEmail);
+        return toResponse(message);
+    }
+
     public MessagePageResponse getMessageContext(UUID messageId, String requesterEmail) {
         Message center = messageRepository.findActiveById(messageId)
                 .orElseThrow(() -> new IllegalArgumentException("Mensaje no encontrado"));
@@ -195,6 +209,10 @@ public class MessageService {
     @Transactional
     public MessageResponse editMessage(UUID messageId, String content, String requesterEmail) {
         Message message = requireOwnedMessage(messageId, requesterEmail);
+        if (message.getDirectMessage() != null) {
+            userRepository.lockActiveById(message.getSender().getId()).orElseThrow();
+            authorizationService.requireDirectMessageSendAccess(message.getDirectMessage().getId(), requesterEmail);
+        }
         if (content == null || content.isBlank() || content.length() > 4000) {
             throw new IllegalArgumentException("El mensaje debe contener entre 1 y 4000 caracteres");
         }
@@ -225,7 +243,7 @@ public class MessageService {
         if (request.getChannelId() != null) {
             authorizationService.requireChannelAccess(request.getChannelId(), email);
         } else {
-            authorizationService.requireDirectMessageAccess(request.getDmId(), email);
+            authorizationService.requireDirectMessageSendAccess(request.getDmId(), email);
         }
         return authorizationService.requireUser(email);
     }

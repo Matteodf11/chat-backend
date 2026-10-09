@@ -35,7 +35,7 @@ class ChatAuthorizationServiceTest {
     @BeforeEach
     void setUp() {
         service = new ChatAuthorizationService(
-                userRepository, channelRepository, directMessageRepository, serverMemberRepository
+                userRepository, channelRepository, directMessageRepository, serverMemberRepository, mock(UserSafetyService.class)
         );
         requester = new User();
         requester.setId(UUID.randomUUID());

@@ -33,6 +33,7 @@ import static org.mockito.Mockito.*;
 class MessageReliabilityTests {
     @Autowired MessageService service;
     @Autowired FriendshipService friends;
+    @Autowired UserSafetyService safety;
     @Autowired UserRepository users;
     @Autowired DirectMessageRepository dms;
     @Autowired MessageRepository messages;
@@ -43,6 +44,65 @@ class MessageReliabilityTests {
     private User sender;
     private User receiver;
     private DirectMessage dm;
+
+    @Test
+    void blockingPreventsBothDirectionsAndRetriesButPreservesHistory() {
+        var request = request(dm, UUID.randomUUID());
+        var original = service.saveMessage(request, sender.getEmail());
+        safety.block(receiver.getId(), sender.getEmail());
+        safety.block(receiver.getId(), sender.getEmail());
+        assertEquals(1, safety.blockedUsers(sender.getEmail()).size());
+        assertTrue(safety.blockedUsers(receiver.getEmail()).isEmpty());
+        assertFalse(safety.canMessage(sender.getId(), receiver.getId()));
+        assertFalse(friends.getMyDms(sender.getEmail(), org.springframework.data.domain.Pageable.unpaged()).content().getFirst().isCanMessage());
+        assertEquals(original.getId(), service.getMessage(original.getId(), receiver.getEmail()).getId());
+        assertEquals(1, service.getDmMessages(dm.getId(), null, 50, sender.getEmail()).getMessages().size());
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.saveMessage(request, sender.getEmail()));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.saveMessage(request(dm, null), receiver.getEmail()));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> friends.sendRequest(sender.getId(), receiver.getEmail()));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> friends.getOrCreateDm(receiver.getId(), sender.getEmail()));
+        var typing = new com.matteo.chat_backend.dto.TypingRequest(); typing.setDmId(dm.getId()); typing.setTyping(true);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.authorizeTyping(typing, receiver.getEmail()));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.editMessage(original.getId(), "Bypass", sender.getEmail()));
+    }
+
+    @Test
+    void blockedAttachmentsAreRejectedBeforeUploading() {
+        safety.block(sender.getId(), receiver.getEmail());
+        var file = new MockMultipartFile("file", "photo.png", "image/png", new byte[]{1, 2, 3});
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.saveAttachmentMessage(request(dm, UUID.randomUUID()), file, sender.getEmail()));
+        verifyNoInteractions(storage);
+    }
+
+    @Test
+    void removingFriendPreservesDmAndAllowsNewRequestWhileUnblockingDoesNotRestoreFriendship() {
+        var first = friends.sendRequest(receiver.getId(), sender.getEmail());
+        friends.acceptRequest(first.getId(), receiver.getEmail());
+        safety.removeFriend(receiver.getId(), sender.getEmail());
+        assertTrue(friends.getFriends(sender.getEmail(), org.springframework.data.domain.Pageable.unpaged()).content().isEmpty());
+        service.saveMessage(request(dm, UUID.randomUUID()), sender.getEmail());
+        var next = friends.sendRequest(receiver.getId(), sender.getEmail());
+        assertNotEquals(first.getId(), next.getId());
+        safety.block(receiver.getId(), sender.getEmail());
+        assertTrue(friends.getPendingRequests(receiver.getEmail(), org.springframework.data.domain.Pageable.unpaged()).content().isEmpty());
+        safety.block(sender.getId(), receiver.getEmail());
+        safety.unblock(receiver.getId(), sender.getEmail());
+        assertFalse(safety.canMessage(sender.getId(), receiver.getId()));
+        safety.unblock(sender.getId(), receiver.getEmail());
+        assertTrue(safety.canMessage(sender.getId(), receiver.getId()));
+        assertTrue(friends.getFriends(sender.getEmail(), org.springframework.data.domain.Pageable.unpaged()).content().isEmpty());
+        assertNotNull(friends.sendRequest(sender.getId(), receiver.getEmail()));
+    }
+
+    @Test
+    void attachmentMetadataRefreshRequiresConversationMembership() {
+        var original = service.saveMessage(request(dm, UUID.randomUUID()), sender.getEmail());
+        var stranger = user("stranger");
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.getMessage(original.getId(), stranger.getEmail()));
+        assertThrows(IllegalArgumentException.class, () -> safety.block(sender.getId(), sender.getEmail()));
+    }
 
     @BeforeEach
     void seed() {

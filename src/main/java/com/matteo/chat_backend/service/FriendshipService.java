@@ -38,7 +38,9 @@ public class FriendshipService {
     private final SimpMessagingTemplate messagingTemplate;
     private final PresenceService presenceService;
     private final MessageCryptoService cryptoService;
+    private final UserSafetyService safety;
 
+    @Transactional
     public FriendshipResponse sendRequest(UUID receiverId, String requesterEmail) {
         User requester = userRepository.findByEmail(requesterEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
@@ -49,7 +51,10 @@ public class FriendshipService {
             throw new ValidationException("No puedes enviarte una solicitud a ti mismo");
         }
 
+        safety.lockPair(requester.getId(), receiverId);
+        safety.requireAllowed(requester.getId(), receiverId);
         friendshipRepository.findBetweenUsers(requester, receiver).ifPresent(f -> {
+            if ("rejected".equals(f.getStatus())) { f.setDeletedAt(LocalDateTime.now()); friendshipRepository.save(f); return; }
             throw new ValidationException("Ya existe una relación con este usuario");
         });
 
@@ -64,6 +69,7 @@ public class FriendshipService {
         return toResponse(friendship, requester);
     }
 
+    @Transactional
     public FriendshipResponse acceptRequest(UUID friendshipId, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
@@ -74,6 +80,8 @@ public class FriendshipService {
             throw new ForbiddenException("No tienes permiso para aceptar esta solicitud");
         }
 
+        safety.lockPair(friendship.getRequester().getId(), friendship.getReceiver().getId());
+        safety.requireAllowed(friendship.getRequester().getId(), friendship.getReceiver().getId());
         friendship.setStatus("accepted");
         friendshipRepository.save(friendship);
 
@@ -112,12 +120,15 @@ public class FriendshipService {
                 .map(f -> toResponse(f, user)));
     }
 
+    @Transactional
     public DmResponse getOrCreateDm(UUID otherUserId, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
         User other = userRepository.findActiveById(otherUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
 
+        safety.lockPair(user.getId(), otherUserId);
+        safety.requireAllowed(user.getId(), otherUserId);
         DirectMessage dm = directMessageRepository.findByUser1AndUser2(user, other)
                 .or(() -> directMessageRepository.findByUser2AndUser1(user, other))
                 .orElseGet(() -> {
@@ -263,7 +274,8 @@ public class FriendshipService {
                 activity,
                 dm.getUser1().getId().equals(currentUser.getId()) ? dm.isUser1Pinned() : dm.isUser2Pinned(),
                 dm.getUser1().getId().equals(currentUser.getId()) ? dm.isUser1Muted() : dm.isUser2Muted(),
-                dm.getUser1().getId().equals(currentUser.getId()) ? dm.isUser1Archived() : dm.isUser2Archived()
+                dm.getUser1().getId().equals(currentUser.getId()) ? dm.isUser1Archived() : dm.isUser2Archived(),
+                safety.canMessage(currentUser.getId(), other.getId())
         );
     }
 

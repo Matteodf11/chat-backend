@@ -54,8 +54,8 @@ class PostgresMigrationTests {
         var jdbc = new JdbcTemplate(dataSource);
         jdbc.execute("ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated");
         var flyway = flyway(dataSource);
-        assertEquals(4, flyway.migrate().migrationsExecuted);
-        assertEquals("V17__conversation_preferences_and_activity.sql", flyway.info().current().getScript());
+        assertEquals(6, flyway.migrate().migrationsExecuted);
+        assertEquals("V19__restrict_user_blocks.sql", flyway.info().current().getScript());
         validateEntities(dataSource);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         assertApiRolesRestricted(jdbc);
@@ -121,9 +121,9 @@ class PostgresMigrationTests {
         jdbc.update("INSERT INTO direct_messages(id, user1_id, user2_id, created_at) VALUES (?, ?, ?, TIMESTAMP '2026-10-02 10:00:00')", emptyDmId, userId, userId);
         jdbc.update("UPDATE messages SET dm_id = ?, created_at = TIMESTAMP '2026-10-09 12:00:00' WHERE id = ?", dmId, messageId);
         var flyway = flyway(dataSource);
-        assertEquals(4, flyway.migrate().migrationsExecuted);
+        assertEquals(6, flyway.migrate().migrationsExecuted);
         flyway.validate();
-        assertEquals("V17__conversation_preferences_and_activity.sql", flyway.info().current().getScript());
+        assertEquals("V19__restrict_user_blocks.sql", flyway.info().current().getScript());
         assertEquals(java.time.LocalDateTime.of(2026, 10, 9, 12, 0), jdbc.queryForObject(
                 "SELECT last_activity_at FROM direct_messages WHERE id = ?", java.sql.Timestamp.class, dmId).toLocalDateTime());
         assertEquals(java.time.LocalDateTime.of(2026, 10, 2, 10, 0), jdbc.queryForObject(
@@ -160,7 +160,7 @@ class PostgresMigrationTests {
     private static MetadataSources metadata(org.hibernate.service.ServiceRegistry registry) {
         var metadata = new MetadataSources(registry);
         for (var type : List.of(User.class, Server.class, Channel.class, ServerMember.class,
-                DirectMessage.class, Message.class, Friendship.class, ServerInvitation.class, AuthSession.class)) {
+                DirectMessage.class, Message.class, Friendship.class, ServerInvitation.class, AuthSession.class, UserBlock.class)) {
             metadata.addAnnotatedClass(type);
         }
         return metadata;
@@ -177,7 +177,7 @@ class PostgresMigrationTests {
 
     private static void assertApiRolesRestricted(JdbcTemplate jdbc) {
         for (var table : List.of("app_users", "users", "servers", "channels", "server_members",
-                "direct_messages", "messages", "friendships", "server_invitations", "auth_sessions")) {
+                "direct_messages", "messages", "friendships", "server_invitations", "auth_sessions", "user_blocks")) {
             assertEquals(Boolean.TRUE, jdbc.queryForObject(
                     "SELECT relrowsecurity FROM pg_class WHERE oid = CAST(? AS regclass)", Boolean.class, table));
             for (var role : List.of("anon", "authenticated")) {
