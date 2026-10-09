@@ -40,4 +40,13 @@ Run the backend:
 .\mvnw.cmd spring-boot:run
 ```
 
-Flyway will create the schema automatically.
+Before starting, export JWT_SECRET and MESSAGE_ENCRYPTION_KEY into the process
+environment. The Maven wrapper does not automatically load a .env file.
+Use the existing encryption key if the database already contains encrypted messages.
+Ignored application.properties/application-local.properties may also override YAML;
+review these local files without committing their credentials.
+
+The checked-in Flyway history does not yet create all core tables in a fresh
+database. It requires an existing compatible schema; do not assume the commands
+above provision a working empty database. See restart-audit-2026-10-09.md before
+changing or deploying migrations.

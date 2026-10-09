@@ -4,6 +4,8 @@ import com.matteo.chat_backend.dto.ProfileEvent;
 import com.matteo.chat_backend.dto.UpdateProfileRequest;
 import com.matteo.chat_backend.dto.UserProfileResponse;
 import com.matteo.chat_backend.entity.User;
+import com.matteo.chat_backend.exception.ConflictException;
+import com.matteo.chat_backend.exception.ResourceNotFoundException;
 import com.matteo.chat_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -23,30 +25,30 @@ public class UserService {
 
     public UserProfileResponse getMyProfile(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", email));
         return toResponse(user);
     }
 
     public UserProfileResponse getUserById(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        User user = userRepository.findActiveById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId.toString()));
         return toResponse(user);
     }
 
     public UserProfileResponse getUserByUsername(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", username));
         return toResponse(user);
     }
 
     public UserProfileResponse updateProfile(UpdateProfileRequest request, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", email));
 
         if (request.getUsername() != null && !request.getUsername().isBlank()) {
             if (!request.getUsername().equals(user.getUsername()) &&
                     userRepository.findByUsername(request.getUsername()).isPresent()) {
-                throw new RuntimeException("El username ya está en uso");
+                throw new ConflictException("User", "username", request.getUsername());
             }
             user.setUsername(request.getUsername());
         }
@@ -74,7 +76,7 @@ public class UserService {
 
     public UserProfileResponse uploadAvatar(MultipartFile file, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
         String avatarUrl = avatarStorageService.uploadAvatar(user, file);
         user.setAvatarUrl(avatarUrl);
         User saved = userRepository.save(user);
@@ -84,7 +86,7 @@ public class UserService {
 
     public UserProfileResponse uploadAvatar(byte[] bytes, String contentType, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
         String avatarUrl = avatarStorageService.uploadAvatar(user, bytes, contentType);
         user.setAvatarUrl(avatarUrl);
         User saved = userRepository.save(user);
@@ -94,7 +96,7 @@ public class UserService {
 
     public UserProfileResponse uploadBanner(MultipartFile file, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
         String bannerUrl = avatarStorageService.uploadBanner(user, file);
         user.setProfileBannerUrl(bannerUrl);
         User saved = userRepository.save(user);
@@ -104,7 +106,7 @@ public class UserService {
 
     public UserProfileResponse uploadBanner(byte[] bytes, String contentType, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
         String bannerUrl = avatarStorageService.uploadBanner(user, bytes, contentType);
         user.setProfileBannerUrl(bannerUrl);
         User saved = userRepository.save(user);
@@ -114,14 +116,14 @@ public class UserService {
 
     public AvatarStorageService.AvatarFile getAvatar(UUID userId, String fileName) {
         if (!userRepository.existsById(userId)) {
-            throw new RuntimeException("Usuario no encontrado");
+            throw new ResourceNotFoundException("Recurso", "Usuario no encontrado");
         }
         return avatarStorageService.downloadAvatar(userId, fileName);
     }
 
     public AvatarStorageService.AvatarFile getBanner(UUID userId, String fileName) {
         if (!userRepository.existsById(userId)) {
-            throw new RuntimeException("Usuario no encontrado");
+            throw new ResourceNotFoundException("Recurso", "Usuario no encontrado");
         }
         return avatarStorageService.downloadBanner(userId, fileName);
     }

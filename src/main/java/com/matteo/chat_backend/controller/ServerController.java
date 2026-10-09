@@ -5,13 +5,14 @@ import com.matteo.chat_backend.service.ServerService;
 import com.matteo.chat_backend.service.AvatarStorageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -30,8 +31,11 @@ public class ServerController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<List<ServerResponse>> getMyServers(Principal principal) {
-        return ResponseEntity.ok(serverService.getMyServers(principal.getName()));
+    public ResponseEntity<?> getMyServers(
+            Principal principal,
+            @RequestParam(defaultValue = "false") boolean paged,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+        return ResponseEntity.ok(serverService.getMyServers(principal.getName(), paged ? pageable : Pageable.unpaged()).responseBody(paged));
     }
 
     @GetMapping("/{serverId}")
@@ -81,17 +85,21 @@ public class ServerController {
     }
 
     @GetMapping("/{serverId}/channels")
-    public ResponseEntity<List<ChannelResponse>> getChannels(
+    public ResponseEntity<?> getChannels(
             @PathVariable UUID serverId,
-            Principal principal) {
-        return ResponseEntity.ok(serverService.getServerChannels(serverId, principal.getName()));
+            Principal principal,
+            @RequestParam(defaultValue = "false") boolean paged,
+            @PageableDefault(size = 50, sort = "name") Pageable pageable) {
+        return ResponseEntity.ok(serverService.getServerChannels(serverId, principal.getName(), paged ? pageable : Pageable.unpaged()).responseBody(paged));
     }
 
     @GetMapping("/{serverId}/members")
-    public ResponseEntity<List<ServerMemberResponse>> getMembers(
+    public ResponseEntity<?> getMembers(
             @PathVariable UUID serverId,
-            Principal principal) {
-        return ResponseEntity.ok(serverService.getServerMembers(serverId, principal.getName()));
+            Principal principal,
+            @RequestParam(defaultValue = "false") boolean paged,
+            @PageableDefault(size = 50, sort = "joinedAt") Pageable pageable) {
+        return ResponseEntity.ok(serverService.getServerMembers(serverId, principal.getName(), paged ? pageable : Pageable.unpaged()).responseBody(paged));
     }
 
     @PutMapping("/{serverId}/members/{userId}/role")
@@ -121,8 +129,11 @@ public class ServerController {
     }
 
     @GetMapping("/invitations/pending")
-    public ResponseEntity<List<ServerInvitationResponse>> getPendingInvitations(Principal principal) {
-        return ResponseEntity.ok(serverService.getPendingInvitations(principal.getName()));
+    public ResponseEntity<?> getPendingInvitations(
+            Principal principal,
+            @RequestParam(defaultValue = "false") boolean paged,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+        return ResponseEntity.ok(serverService.getPendingInvitations(principal.getName(), paged ? pageable : Pageable.unpaged()).responseBody(paged));
     }
 
     @PostMapping("/invitations/{invitationId}/accept")

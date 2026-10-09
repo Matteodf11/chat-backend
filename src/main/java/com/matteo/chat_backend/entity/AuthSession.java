@@ -38,4 +38,7 @@ public class AuthSession {
 
     @Column(name = "revoked_at")
     private LocalDateTime revokedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }

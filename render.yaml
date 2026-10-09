@@ -5,11 +5,19 @@ services:
     buildCommand: ./mvnw clean package -DskipTests
     startCommand: java -jar target/chat-backend-0.0.1-SNAPSHOT.jar
     envVars:
-      - key: DATABASE_URL
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: DB_URL
         sync: false
-      - key: DATABASE_USERNAME
+      - key: DB_USERNAME
         sync: false
-      - key: DATABASE_PASSWORD
+      - key: DB_PASSWORD
         sync: false
       - key: JWT_SECRET
+        sync: false
+      - key: MESSAGE_ENCRYPTION_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false

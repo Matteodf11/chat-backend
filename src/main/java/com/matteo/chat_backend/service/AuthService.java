@@ -6,11 +6,12 @@ import com.matteo.chat_backend.dto.LoginRequest;
 import com.matteo.chat_backend.dto.RegisterRequest;
 import com.matteo.chat_backend.entity.AuthSession;
 import com.matteo.chat_backend.entity.User;
+import com.matteo.chat_backend.exception.ConflictException;
+import com.matteo.chat_backend.exception.UnauthorizedException;
 import com.matteo.chat_backend.repository.AuthSessionRepository;
 import com.matteo.chat_backend.repository.UserRepository;
 import com.matteo.chat_backend.security.JwtService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -40,8 +41,8 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) throw new IllegalArgumentException("El email ya esta en uso");
-        if (userRepository.existsByUsername(request.getUsername())) throw new IllegalArgumentException("El username ya esta en uso");
+        if (userRepository.existsByEmail(request.getEmail())) throw new ConflictException("User", "email", request.getEmail());
+        if (userRepository.existsByUsername(request.getUsername())) throw new ConflictException("User", "username", request.getUsername());
 
         User user = new User();
         user.setUsername(request.getUsername().trim());
@@ -58,7 +59,7 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         String email = request.getEmail().trim().toLowerCase();
         authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, request.getPassword()));
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new AccessDeniedException("Credenciales no validas"));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new UnauthorizedException("Credenciales no válidas"));
         user.setLastSeen(LocalDateTime.now());
         userRepository.save(user);
         return createSession(user, Boolean.TRUE.equals(request.getRememberMe()), cleanDeviceName(request.getDeviceName()));
@@ -67,10 +68,10 @@ public class AuthService {
     @Transactional
     public AuthResponse refresh(String refreshToken) {
         AuthSession session = authSessionRepository.findByTokenHash(hash(refreshToken))
-                .orElseThrow(() -> new AccessDeniedException("Sesion no valida"));
+                .orElseThrow(() -> new UnauthorizedException("Sesión no válida"));
         LocalDateTime now = LocalDateTime.now();
         if (session.getRevokedAt() != null || session.getExpiresAt().isBefore(now)) {
-            throw new AccessDeniedException("Sesion caducada");
+            throw new UnauthorizedException("Sesión caducada");
         }
         String rotatedToken = randomToken();
         session.setTokenHash(hash(rotatedToken));
@@ -89,12 +90,12 @@ public class AuthService {
 
     @Transactional
     public void changePassword(ChangePasswordRequest request, String email) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new AccessDeniedException("Usuario no autorizado"));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new UnauthorizedException("Usuario no autorizado"));
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-            throw new AccessDeniedException("La contrasena actual no es correcta");
+            throw new UnauthorizedException("La contraseña actual no es correcta");
         }
         if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("La nueva contrasena debe ser diferente");
+            throw new IllegalArgumentException("La nueva contraseña debe ser diferente");
         }
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         user.setTokenVersion(user.getTokenVersion() + 1);
@@ -136,7 +137,7 @@ public class AuthService {
     }
 
     private String hash(String token) {
-        if (token == null || token.isBlank()) throw new AccessDeniedException("Sesion no valida");
+        if (token == null || token.isBlank()) throw new UnauthorizedException("Sesión no válida");
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {

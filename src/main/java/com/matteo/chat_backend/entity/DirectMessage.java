@@ -30,4 +30,7 @@ public class DirectMessage {
 
     @Column(name = "user2_last_read_at", nullable = false)
     private LocalDateTime user2LastReadAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }

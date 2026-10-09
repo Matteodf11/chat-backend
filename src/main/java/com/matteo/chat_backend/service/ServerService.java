@@ -1,9 +1,14 @@
 package com.matteo.chat_backend.service;
 
+import com.matteo.chat_backend.exception.ForbiddenException;
+
+import com.matteo.chat_backend.exception.ValidationException;
+
 import com.matteo.chat_backend.dto.ChannelResponse;
 import com.matteo.chat_backend.dto.CreateChannelRequest;
 import com.matteo.chat_backend.dto.CreateServerRequest;
 import com.matteo.chat_backend.dto.InviteServerMemberRequest;
+import com.matteo.chat_backend.dto.PageResponse;
 import com.matteo.chat_backend.dto.ServerInvitationResponse;
 import com.matteo.chat_backend.dto.ServerMemberResponse;
 import com.matteo.chat_backend.dto.ServerResponse;
@@ -14,6 +19,7 @@ import com.matteo.chat_backend.entity.Server;
 import com.matteo.chat_backend.entity.ServerInvitation;
 import com.matteo.chat_backend.entity.ServerMember;
 import com.matteo.chat_backend.entity.User;
+import com.matteo.chat_backend.exception.ResourceNotFoundException;
 import com.matteo.chat_backend.repository.ChannelRepository;
 import com.matteo.chat_backend.repository.MessageRepository;
 import com.matteo.chat_backend.repository.ServerMemberRepository;
@@ -48,7 +54,7 @@ public class ServerService {
     @Transactional
     public ServerResponse createServer(CreateServerRequest request, String email) {
         User owner = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
 
         Server server = new Server();
         server.setName(request.getName());
@@ -75,20 +81,18 @@ public class ServerService {
         return toResponse(server, "owner");
     }
 
-    public List<ServerResponse> getMyServers(String email) {
+    public PageResponse<ServerResponse> getMyServers(String email, org.springframework.data.domain.Pageable pageable) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        return serverRepository.findServersByMember(user)
-                .stream()
-                .map(server -> toResponse(server, roleFor(server, user)))
-                .collect(Collectors.toList());
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        return PageResponse.of(serverRepository.findServersByMember(user, pageable)
+                .map(server -> toResponse(server, roleFor(server, user))));
     }
 
     public ServerResponse getServer(UUID serverId, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         ServerMember member = requireMember(server, user);
         return toResponse(server, member.getRole());
     }
@@ -96,9 +100,9 @@ public class ServerService {
     @Transactional
     public ServerResponse updateServer(UUID serverId, UpdateServerRequest request, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
 
         ServerMember member = requireManager(server, user);
 
@@ -115,9 +119,9 @@ public class ServerService {
     @Transactional
     public ServerResponse uploadServerIcon(UUID serverId, byte[] bytes, String contentType, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         ServerMember member = requireManager(server, user);
         server.setIconUrl(avatarStorageService.uploadServerIcon(server, bytes, contentType));
         serverRepository.save(server);
@@ -131,9 +135,9 @@ public class ServerService {
     @Transactional
     public ChannelResponse createChannel(UUID serverId, CreateChannelRequest request, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
 
         requireManager(server, user);
 
@@ -147,46 +151,42 @@ public class ServerService {
         return toChannelResponse(channel);
     }
 
-    public List<ChannelResponse> getServerChannels(UUID serverId, String email) {
+    public PageResponse<ChannelResponse> getServerChannels(UUID serverId, String email, org.springframework.data.domain.Pageable pageable) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         requireMember(server, user);
-        return channelRepository.findByServerId(serverId)
-                .stream().map(this::toChannelResponse).collect(Collectors.toList());
+        return PageResponse.of(channelRepository.findByServerId(serverId, pageable)
+                .map(this::toChannelResponse));
     }
 
-    public List<ServerMemberResponse> getServerMembers(UUID serverId, String email) {
+    public PageResponse<ServerMemberResponse> getServerMembers(UUID serverId, String email, org.springframework.data.domain.Pageable pageable) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         requireMember(server, user);
-        return serverMemberRepository.findByServer(server)
-                .stream()
-                .sorted(Comparator.comparingInt(this::roleOrder)
-                        .thenComparing(member -> member.getUser().getUsername(), String.CASE_INSENSITIVE_ORDER))
-                .map(this::toMemberResponse)
-                .collect(Collectors.toList());
+        return PageResponse.of(serverMemberRepository.findByServer(server, pageable)
+                .map(this::toMemberResponse));
     }
 
     @Transactional
     public ServerMemberResponse updateMemberRole(UUID serverId, UUID targetUserId, String role, String email) {
         User actor = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         requireOwner(server, actor);
 
         if (!"admin".equals(role) && !"member".equals(role)) {
             throw new IllegalArgumentException("Rol no valido");
         }
-        User targetUser = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new RuntimeException("Miembro no encontrado"));
+        User targetUser = userRepository.findActiveById(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Miembro no encontrado"));
         ServerMember target = requireMember(server, targetUser);
         if (server.getOwner().getId().equals(targetUserId) || "owner".equals(target.getRole())) {
-            throw new RuntimeException("No puedes cambiar el rol del dueno");
+            throw new ValidationException("No puedes cambiar el rol del dueno");
         }
         target.setRole(role);
         ServerMemberResponse response = toMemberResponse(serverMemberRepository.save(target));
@@ -201,24 +201,25 @@ public class ServerService {
     @Transactional
     public void removeMember(UUID serverId, UUID targetUserId, String email) {
         User actor = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         ServerMember actorMember = requireManager(server, actor);
-        User targetUser = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new RuntimeException("Miembro no encontrado"));
+        User targetUser = userRepository.findActiveById(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Miembro no encontrado"));
         ServerMember target = requireMember(server, targetUser);
 
         if (actor.getId().equals(targetUserId)) {
-            throw new RuntimeException("Usa la opcion de salir del servidor");
+            throw new ValidationException("Usa la opcion de salir del servidor");
         }
         if (server.getOwner().getId().equals(targetUserId) || "owner".equals(target.getRole())) {
-            throw new RuntimeException("El dueno no puede ser expulsado");
+            throw new ForbiddenException("El dueno no puede ser expulsado");
         }
         if ("admin".equals(actorMember.getRole()) && !"member".equals(target.getRole())) {
-            throw new RuntimeException("Un administrador solo puede expulsar miembros");
+            throw new ForbiddenException("Un administrador solo puede expulsar miembros");
         }
-        serverMemberRepository.delete(target);
+        target.setDeletedAt(LocalDateTime.now());
+        serverMemberRepository.save(target);
         serverMemberRepository.flush();
         messagingTemplate.convertAndSendToUser(
                 targetUser.getEmail(),
@@ -230,21 +231,21 @@ public class ServerService {
     @Transactional
     public ServerInvitationResponse inviteMember(UUID serverId, InviteServerMemberRequest request, String email) {
         User inviter = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         requireManager(server, inviter);
 
         User invited = findUserByUsernameOrEmail(request.getUsername())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
         if (invited.getId().equals(inviter.getId())) {
-            throw new RuntimeException("No puedes invitarte a ti mismo");
+            throw new ValidationException("No puedes invitarte a ti mismo");
         }
         if (serverMemberRepository.existsByServerAndUser(server, invited)) {
-            throw new RuntimeException("Ese usuario ya esta en el servidor");
+            throw new ValidationException("Ese usuario ya esta en el servidor");
         }
         if (serverInvitationRepository.findByServerAndInviteeAndStatus(server, invited, "pending").isPresent()) {
-            throw new RuntimeException("Ese usuario ya tiene una invitacion pendiente");
+            throw new ValidationException("Ese usuario ya tiene una invitacion pendiente");
         }
 
         ServerInvitation invitation = new ServerInvitation();
@@ -257,21 +258,21 @@ public class ServerService {
         return toInvitationResponse(invitation);
     }
 
-    public List<ServerInvitationResponse> getPendingInvitations(String email) {
+    public PageResponse<ServerInvitationResponse> getPendingInvitations(String email, org.springframework.data.domain.Pageable pageable) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        return serverInvitationRepository.findByInviteeAndStatusOrderByCreatedAtDesc(user, "pending")
-                .stream().map(this::toInvitationResponse).collect(Collectors.toList());
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        return PageResponse.of(serverInvitationRepository.findByInviteeAndStatusOrderByCreatedAtDesc(user, "pending", pageable)
+                .map(this::toInvitationResponse));
     }
 
     @Transactional
     public ServerResponse acceptInvitation(UUID invitationId, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
         ServerInvitation invitation = serverInvitationRepository.findByIdAndInvitee(invitationId, user)
-                .orElseThrow(() -> new RuntimeException("Invitacion no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Invitacion no encontrada"));
         if (!"pending".equals(invitation.getStatus())) {
-            throw new RuntimeException("La invitacion ya no esta pendiente");
+            throw new ValidationException("La invitacion ya no esta pendiente");
         }
 
         Server server = invitation.getServer();
@@ -293,9 +294,9 @@ public class ServerService {
     @Transactional
     public void rejectInvitation(UUID invitationId, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
         ServerInvitation invitation = serverInvitationRepository.findByIdAndInvitee(invitationId, user)
-                .orElseThrow(() -> new RuntimeException("Invitacion no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Invitacion no encontrada"));
         if (!"pending".equals(invitation.getStatus())) {
             return;
         }
@@ -308,24 +309,25 @@ public class ServerService {
     @Transactional
     public void leaveServer(UUID serverId, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         ServerMember member = requireMember(server, user);
         if ("owner".equals(member.getRole()) || server.getOwner().getId().equals(user.getId())) {
-            throw new RuntimeException("El dueno debe borrar el servidor antes de salir");
+            throw new ValidationException("El dueno debe borrar el servidor antes de salir");
         }
-        serverMemberRepository.delete(member);
+        member.setDeletedAt(LocalDateTime.now());
+        serverMemberRepository.save(member);
     }
 
     @Transactional
     public void deleteServer(UUID serverId, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Server server = serverRepository.findById(serverId)
-                .orElseThrow(() -> new RuntimeException("Servidor no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email"));
+        Server server = serverRepository.findActiveById(serverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         if (!server.getOwner().getId().equals(user.getId())) {
-            throw new RuntimeException("Solo el dueno puede borrar este servidor");
+            throw new ForbiddenException("Solo el dueno puede borrar este servidor");
         }
 
         List<String> memberEmails = serverMemberRepository.findByServer(server).stream()
@@ -335,12 +337,13 @@ public class ServerService {
         List<UUID> channelIds = channelRepository.findByServerId(serverId)
                 .stream().map(Channel::getId).toList();
         if (!channelIds.isEmpty()) {
-            messageRepository.deleteByChannelIds(channelIds);
+            messageRepository.softDeleteByChannelIds(channelIds);
         }
-        serverInvitationRepository.deleteByServer(server);
-        channelRepository.deleteByServerId(serverId);
-        serverMemberRepository.deleteByServer(server);
-        serverRepository.delete(server);
+        serverInvitationRepository.softDeleteByServer(server);
+        channelRepository.softDeleteByServerId(serverId);
+        serverMemberRepository.softDeleteByServer(server);
+        server.setDeletedAt(LocalDateTime.now());
+        serverRepository.save(server);
         memberEmails.forEach(memberEmail -> messagingTemplate.convertAndSendToUser(
                 memberEmail,
                 "/queue/server-events",
@@ -395,13 +398,13 @@ public class ServerService {
 
     private ServerMember requireMember(Server server, User user) {
         return serverMemberRepository.findByServerAndUser(server, user)
-                .orElseThrow(() -> new RuntimeException("No eres miembro de este servidor"));
+                .orElseThrow(() -> new ForbiddenException("No eres miembro de este servidor"));
     }
 
     private ServerMember requireManager(Server server, User user) {
         ServerMember member = requireMember(server, user);
         if (!"owner".equals(member.getRole()) && !"admin".equals(member.getRole())) {
-            throw new RuntimeException("No tienes permisos para gestionar este servidor");
+            throw new ForbiddenException("No tienes permisos para gestionar este servidor");
         }
         return member;
     }
@@ -409,7 +412,7 @@ public class ServerService {
     private ServerMember requireOwner(Server server, User user) {
         ServerMember member = requireMember(server, user);
         if (!server.getOwner().getId().equals(user.getId()) || !"owner".equals(member.getRole())) {
-            throw new RuntimeException("Solo el dueno puede gestionar los roles");
+            throw new ForbiddenException("Solo el dueno puede gestionar los roles");
         }
         return member;
     }

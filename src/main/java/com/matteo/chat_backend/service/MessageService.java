@@ -69,7 +69,7 @@ public class MessageService {
         }
 
         if (request.getReplyToId() != null) {
-            Message replyTo = messageRepository.findById(request.getReplyToId())
+            Message replyTo = messageRepository.findActiveById(request.getReplyToId())
                     .orElseThrow(() -> new IllegalArgumentException("El mensaje al que respondes ya no existe"));
             requireSameDestination(message, replyTo);
             message.setReplyTo(replyTo);
@@ -142,7 +142,7 @@ public class MessageService {
     }
 
     public MessagePageResponse getMessageContext(UUID messageId, String requesterEmail) {
-        Message center = messageRepository.findById(messageId)
+        Message center = messageRepository.findActiveById(messageId)
                 .orElseThrow(() -> new IllegalArgumentException("Mensaje no encontrado"));
         UUID channelId = center.getChannel() != null ? center.getChannel().getId() : null;
         UUID dmId = center.getDirectMessage() != null ? center.getDirectMessage().getId() : null;
@@ -188,7 +188,8 @@ public class MessageService {
         MessageResponse response = toResponse(message);
         response.setContent("");
         response.setDeleted(true);
-        messageRepository.delete(message);
+        message.setDeletedAt(LocalDateTime.now());
+        messageRepository.save(message);
         attachmentStorageService.delete(message.getAttachmentKey());
         return response;
     }
@@ -311,7 +312,7 @@ public class MessageService {
     }
 
     private Message requireOwnedMessage(UUID messageId, String requesterEmail) {
-        Message message = messageRepository.findById(messageId)
+        Message message = messageRepository.findActiveById(messageId)
                 .orElseThrow(() -> new IllegalArgumentException("Mensaje no encontrado"));
         authorizationService.requireUser(requesterEmail);
         if (!message.getSender().getEmail().equalsIgnoreCase(requesterEmail)) {

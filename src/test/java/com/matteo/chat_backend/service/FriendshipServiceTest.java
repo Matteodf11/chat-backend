@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
@@ -62,21 +63,20 @@ class FriendshipServiceTest {
     @Test
     void dmIsUnreadWhenOtherUserSentANewerMessage() {
         when(userRepository.findByEmail(user1.getEmail())).thenReturn(Optional.of(user1));
-        when(directMessageRepository.findByUser1(user1)).thenReturn(List.of(dm));
-        when(directMessageRepository.findByUser2(user1)).thenReturn(List.of());
+        when(directMessageRepository.findAllByUser(user1, PageRequest.of(0, 20))).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(dm)));
         when(messageRepository.countUnreadDmMessages(dm.getId(), user1.getId(), dm.getUser1LastReadAt()))
                 .thenReturn(1L);
 
-        var result = service.getMyDms(user1.getEmail());
+        var result = service.getMyDms(user1.getEmail(), PageRequest.of(0, 20));
 
-        assertTrue(result.getFirst().getHasUnread());
+        assertTrue(result.content().getFirst().getHasUnread());
     }
 
     @Test
     void markingReadUpdatesOnlyCurrentParticipant() {
         LocalDateTime previousUser2Read = dm.getUser2LastReadAt();
         when(userRepository.findByEmail(user1.getEmail())).thenReturn(Optional.of(user1));
-        when(directMessageRepository.findById(dm.getId())).thenReturn(Optional.of(dm));
+        when(directMessageRepository.findActiveById(dm.getId())).thenReturn(Optional.of(dm));
 
         service.markDmRead(dm.getId(), user1.getEmail());
 

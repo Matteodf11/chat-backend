@@ -1,8 +1,15 @@
 package com.matteo.chat_backend.service;
 
+import com.matteo.chat_backend.exception.ForbiddenException;
+
+import com.matteo.chat_backend.exception.ValidationException;
+
+import com.matteo.chat_backend.exception.ResourceNotFoundException;
+
 import com.matteo.chat_backend.dto.DmResponse;
 import com.matteo.chat_backend.dto.FriendshipEvent;
 import com.matteo.chat_backend.dto.FriendshipResponse;
+import com.matteo.chat_backend.dto.PageResponse;
 import com.matteo.chat_backend.entity.DirectMessage;
 import com.matteo.chat_backend.entity.Friendship;
 import com.matteo.chat_backend.entity.User;
@@ -33,16 +40,16 @@ public class FriendshipService {
 
     public FriendshipResponse sendRequest(UUID receiverId, String requesterEmail) {
         User requester = userRepository.findByEmail(requesterEmail)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        User receiver = userRepository.findById(receiverId)
-                .orElseThrow(() -> new RuntimeException("Usuario destino no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
+        User receiver = userRepository.findActiveById(receiverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario destino no encontrado"));
 
         if (requester.getId().equals(receiverId)) {
-            throw new RuntimeException("No puedes enviarte una solicitud a ti mismo");
+            throw new ValidationException("No puedes enviarte una solicitud a ti mismo");
         }
 
         friendshipRepository.findBetweenUsers(requester, receiver).ifPresent(f -> {
-            throw new RuntimeException("Ya existe una relación con este usuario");
+            throw new ValidationException("Ya existe una relación con este usuario");
         });
 
         Friendship friendship = new Friendship();
@@ -58,12 +65,12 @@ public class FriendshipService {
 
     public FriendshipResponse acceptRequest(UUID friendshipId, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Friendship friendship = friendshipRepository.findById(friendshipId)
-                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
+        Friendship friendship = friendshipRepository.findActiveById(friendshipId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Solicitud no encontrada"));
 
         if (!friendship.getReceiver().getId().equals(user.getId())) {
-            throw new RuntimeException("No tienes permiso para aceptar esta solicitud");
+            throw new ForbiddenException("No tienes permiso para aceptar esta solicitud");
         }
 
         friendship.setStatus("accepted");
@@ -75,12 +82,12 @@ public class FriendshipService {
 
     public FriendshipResponse rejectRequest(UUID friendshipId, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        Friendship friendship = friendshipRepository.findById(friendshipId)
-                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
+        Friendship friendship = friendshipRepository.findActiveById(friendshipId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Solicitud no encontrada"));
 
         if (!friendship.getReceiver().getId().equals(user.getId())) {
-            throw new RuntimeException("No tienes permiso para rechazar esta solicitud");
+            throw new ForbiddenException("No tienes permiso para rechazar esta solicitud");
         }
 
         friendship.setStatus("rejected");
@@ -90,25 +97,25 @@ public class FriendshipService {
         return toResponse(friendship, user);
     }
 
-    public List<FriendshipResponse> getFriends(String email) {
+    public PageResponse<FriendshipResponse> getFriends(String email, org.springframework.data.domain.Pageable pageable) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        return friendshipRepository.findAllByUserAndStatus(user, "accepted")
-                .stream().map(f -> toResponse(f, user)).collect(Collectors.toList());
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
+        return PageResponse.of(friendshipRepository.findAllByUserAndStatus(user, "accepted", pageable)
+                .map(f -> toResponse(f, user)));
     }
 
-    public List<FriendshipResponse> getPendingRequests(String email) {
+    public PageResponse<FriendshipResponse> getPendingRequests(String email, org.springframework.data.domain.Pageable pageable) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        return friendshipRepository.findAllByUserAndStatus(user, "pending")
-                .stream().map(f -> toResponse(f, user)).collect(Collectors.toList());
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
+        return PageResponse.of(friendshipRepository.findAllByUserAndStatus(user, "pending", pageable)
+                .map(f -> toResponse(f, user)));
     }
 
     public DmResponse getOrCreateDm(UUID otherUserId, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        User other = userRepository.findById(otherUserId)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
+        User other = userRepository.findActiveById(otherUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
 
         DirectMessage dm = directMessageRepository.findByUser1AndUser2(user, other)
                 .or(() -> directMessageRepository.findByUser2AndUser1(user, other))
@@ -126,29 +133,20 @@ public class FriendshipService {
         return toDmResponse(dm, user);
     }
 
-    public List<DmResponse> getMyDms(String email) {
+    public PageResponse<DmResponse> getMyDms(String email, org.springframework.data.domain.Pageable pageable) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
 
-        List<DirectMessage> dms1 = directMessageRepository.findByUser1(user);
-        List<DirectMessage> dms2 = directMessageRepository.findByUser2(user);
-
-        List<DmResponse> result = dms1.stream()
-                .map(dm -> toDmResponse(dm, user))
-                .collect(Collectors.toList());
-        dms2.stream()
-                .map(dm -> toDmResponse(dm, user))
-                .forEach(result::add);
-
-        return result;
+        return PageResponse.of(directMessageRepository.findAllByUser(user, pageable)
+                .map(dm -> toDmResponse(dm, user)));
     }
 
     @Transactional
     public void markDmRead(UUID dmId, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        DirectMessage dm = directMessageRepository.findById(dmId)
-                .orElseThrow(() -> new RuntimeException("Conversacion no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Usuario no encontrado"));
+        DirectMessage dm = directMessageRepository.findActiveById(dmId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Conversacion no encontrada"));
         LocalDateTime now = LocalDateTime.now();
         if (dm.getUser1().getId().equals(user.getId())) {
             dm.setUser1LastReadAt(now);

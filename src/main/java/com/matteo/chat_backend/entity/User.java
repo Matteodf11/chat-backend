@@ -45,4 +45,7 @@ public class User {
 
     @Column(name = "token_version", nullable = false)
     private Integer tokenVersion = 0;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }

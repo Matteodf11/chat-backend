@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ActiveProfiles("test")
@@ -39,8 +40,9 @@ class ChatBackendApplicationTests {
 		mockMvc.perform(delete(
 				"/api/servers/00000000-0000-0000-0000-000000000001/members/00000000-0000-0000-0000-000000000002"
 		))
-				.andExpect(status().isBadRequest())
-				.andExpect(content().json("{\"error\":\"Usuario no encontrado\"}"));
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error").value("Recurso no encontrado"))
+				.andExpect(jsonPath("$.message").value("User no encontrado con id: email"));
 	}
 
 }

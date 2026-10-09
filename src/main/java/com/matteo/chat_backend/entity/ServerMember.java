@@ -27,4 +27,7 @@ public class ServerMember {
 
     @Column(name = "joined_at")
     private LocalDateTime joinedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }

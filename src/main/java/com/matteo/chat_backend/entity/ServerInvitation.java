@@ -35,4 +35,7 @@ public class ServerInvitation {
 
     @Column(name = "responded_at")
     private LocalDateTime respondedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }

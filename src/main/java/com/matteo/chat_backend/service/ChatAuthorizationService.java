@@ -29,7 +29,7 @@ public class ChatAuthorizationService {
 
     public Channel requireChannelAccess(UUID channelId, String email) {
         User user = requireUser(email);
-        Channel channel = channelRepository.findById(channelId)
+        Channel channel = channelRepository.findActiveById(channelId)
                 .orElseThrow(() -> new AccessDeniedException("Canal no disponible"));
         if (!serverMemberRepository.existsByServerAndUser(channel.getServer(), user)) {
             throw new AccessDeniedException("No tienes acceso a este canal");
@@ -39,7 +39,7 @@ public class ChatAuthorizationService {
 
     public DirectMessage requireDirectMessageAccess(UUID dmId, String email) {
         User user = requireUser(email);
-        DirectMessage directMessage = directMessageRepository.findById(dmId)
+        DirectMessage directMessage = directMessageRepository.findActiveById(dmId)
                 .orElseThrow(() -> new AccessDeniedException("Conversacion no disponible"));
         boolean participant = directMessage.getUser1().getId().equals(user.getId())
                 || directMessage.getUser2().getId().equals(user.getId());

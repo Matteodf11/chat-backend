@@ -48,7 +48,7 @@ class ChatAuthorizationServiceTest {
         UUID channelId = UUID.randomUUID();
         Channel channel = new Channel();
         channel.setServer(new Server());
-        when(channelRepository.findById(channelId)).thenReturn(Optional.of(channel));
+        when(channelRepository.findActiveById(channelId)).thenReturn(Optional.of(channel));
         when(serverMemberRepository.existsByServerAndUser(channel.getServer(), requester)).thenReturn(false);
 
         assertThrows(AccessDeniedException.class,
@@ -63,7 +63,7 @@ class ChatAuthorizationServiceTest {
         DirectMessage dm = new DirectMessage();
         dm.setUser1(requester);
         dm.setUser2(participant);
-        when(directMessageRepository.findById(dmId)).thenReturn(Optional.of(dm));
+        when(directMessageRepository.findActiveById(dmId)).thenReturn(Optional.of(dm));
 
         assertSame(dm, service.requireDirectMessageAccess(dmId, requester.getEmail()));
 

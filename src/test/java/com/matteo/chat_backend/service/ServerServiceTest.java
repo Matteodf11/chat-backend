@@ -68,11 +68,15 @@ class ServerServiceTest {
     void ownerCanRemoveMemberAndTargetReceivesEvent() {
         ServerMember ownerMembership = membership(owner, "owner");
         ServerMember targetMembership = membership(member, "member");
+        targetMembership.setId(UUID.randomUUID());
         stubActorAndTarget(owner, member, ownerMembership, targetMembership);
 
         service.removeMember(server.getId(), member.getId(), owner.getEmail());
 
-        verify(serverMemberRepository).delete(targetMembership);
+        verify(serverMemberRepository).save(org.mockito.ArgumentMatchers.argThat(m ->
+                m.getId() != null && m.getId().equals(targetMembership.getId())
+                        && m.getDeletedAt() != null
+        ));
         verify(serverMemberRepository).flush();
         verify(messagingTemplate).convertAndSendToUser(
                 eq(member.getEmail()), eq("/queue/server-events"),
@@ -93,7 +97,7 @@ class ServerServiceTest {
         assertThrows(RuntimeException.class,
                 () -> service.removeMember(server.getId(), member.getId(), admin.getEmail()));
 
-        verify(serverMemberRepository, never()).delete(targetMembership);
+        verify(serverMemberRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -101,7 +105,7 @@ class ServerServiceTest {
         User admin = user("admin@example.com");
         ServerMember actorMembership = membership(admin, "admin");
         when(userRepository.findByEmail(admin.getEmail())).thenReturn(Optional.of(admin));
-        when(serverRepository.findById(server.getId())).thenReturn(Optional.of(server));
+        when(serverRepository.findActiveById(server.getId())).thenReturn(Optional.of(server));
         when(serverMemberRepository.findByServerAndUser(server, admin)).thenReturn(Optional.of(actorMembership));
 
         assertThrows(RuntimeException.class,
@@ -128,8 +132,8 @@ class ServerServiceTest {
             ServerMember targetMembership
     ) {
         when(userRepository.findByEmail(actor.getEmail())).thenReturn(Optional.of(actor));
-        when(serverRepository.findById(server.getId())).thenReturn(Optional.of(server));
-        when(userRepository.findById(target.getId())).thenReturn(Optional.of(target));
+        when(serverRepository.findActiveById(server.getId())).thenReturn(Optional.of(server));
+        when(userRepository.findActiveById(target.getId())).thenReturn(Optional.of(target));
         when(serverMemberRepository.findByServerAndUser(server, actor)).thenReturn(Optional.of(actorMembership));
         when(serverMemberRepository.findByServerAndUser(server, target)).thenReturn(Optional.of(targetMembership));
     }
