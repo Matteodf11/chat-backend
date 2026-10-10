@@ -10,6 +10,12 @@ import java.util.UUID;
 @Data
 public class Message {
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @org.hibernate.annotations.BatchSize(size = 100)
+    @CollectionTable(name = "message_mentions", joinColumns = @JoinColumn(name = "message_id"))
+    @Column(name = "user_id")
+    private java.util.Set<UUID> mentionedUserIds = new java.util.HashSet<>();
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

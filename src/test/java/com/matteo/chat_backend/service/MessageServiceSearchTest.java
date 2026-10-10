@@ -45,7 +45,8 @@ class MessageServiceSearchTest {
                 authorizationService,
                 cryptoService,
                 rateLimiter,
-                attachmentStorageService
+                attachmentStorageService,
+                org.mockito.Mockito.mock(ChannelActivityService.class)
         );
         channelId = UUID.randomUUID();
     }

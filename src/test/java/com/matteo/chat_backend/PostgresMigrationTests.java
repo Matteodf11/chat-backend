@@ -54,8 +54,8 @@ class PostgresMigrationTests {
         var jdbc = new JdbcTemplate(dataSource);
         jdbc.execute("ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated");
         var flyway = flyway(dataSource);
-        assertEquals(6, flyway.migrate().migrationsExecuted);
-        assertEquals("V19__restrict_user_blocks.sql", flyway.info().current().getScript());
+        assertEquals(8, flyway.migrate().migrationsExecuted);
+        assertEquals("V21__protect_channel_activity.sql", flyway.info().current().getScript());
         validateEntities(dataSource);
         assertEquals(0, flyway.migrate().migrationsExecuted);
         assertApiRolesRestricted(jdbc);
@@ -84,11 +84,15 @@ class PostgresMigrationTests {
             message.setSender(user);
             message.setChannel(channel);
             message.setContent("test-message-".repeat(100));
+            message.getMentionedUserIds().add(user.getId());
             session.persist(message);
+            var read = new ChannelRead(); read.setUserId(user.getId()); read.setChannelId(channel.getId());
+            read.setReadAt(java.time.LocalDateTime.now()); session.persist(read);
             transaction.commit();
             session.clear();
             assertEquals("Migration biography", session.find(User.class, user.getId()).getBio());
             assertEquals(message.getContent(), session.find(Message.class, message.getId()).getContent());
+            assertEquals(java.util.Set.of(user.getId()), session.find(Message.class, message.getId()).getMentionedUserIds());
         }
     }
 
@@ -104,8 +108,10 @@ class PostgresMigrationTests {
         var userId = UUID.randomUUID();
         var serverId = UUID.randomUUID();
         var messageId = UUID.randomUUID();
+        var channelId = UUID.randomUUID();
         jdbc.update("INSERT INTO users(id, username, email, password_hash) VALUES (?, 'legacy', 'legacy@example.invalid', 'hash')", userId);
         jdbc.update("INSERT INTO servers(id, name, owner_id) VALUES (?, 'legacy', ?)", serverId, userId);
+        jdbc.update("INSERT INTO channels(id, server_id, name) VALUES (?, ?, 'general')", channelId, serverId);
         jdbc.update("INSERT INTO server_members(id, server_id, user_id, role) VALUES (?, ?, ?, 'member')", UUID.randomUUID(), serverId, userId);
         jdbc.update("INSERT INTO messages(id, sender_id, content) VALUES (?, ?, 'preserved encrypted payload')", messageId, userId);
         var oldVersion = Flyway.configure().dataSource(dataSource)
@@ -121,9 +127,9 @@ class PostgresMigrationTests {
         jdbc.update("INSERT INTO direct_messages(id, user1_id, user2_id, created_at) VALUES (?, ?, ?, TIMESTAMP '2026-10-02 10:00:00')", emptyDmId, userId, userId);
         jdbc.update("UPDATE messages SET dm_id = ?, created_at = TIMESTAMP '2026-10-09 12:00:00' WHERE id = ?", dmId, messageId);
         var flyway = flyway(dataSource);
-        assertEquals(6, flyway.migrate().migrationsExecuted);
+        assertEquals(8, flyway.migrate().migrationsExecuted);
         flyway.validate();
-        assertEquals("V19__restrict_user_blocks.sql", flyway.info().current().getScript());
+        assertEquals("V21__protect_channel_activity.sql", flyway.info().current().getScript());
         assertEquals(java.time.LocalDateTime.of(2026, 10, 9, 12, 0), jdbc.queryForObject(
                 "SELECT last_activity_at FROM direct_messages WHERE id = ?", java.sql.Timestamp.class, dmId).toLocalDateTime());
         assertEquals(java.time.LocalDateTime.of(2026, 10, 2, 10, 0), jdbc.queryForObject(
@@ -133,6 +139,8 @@ class PostgresMigrationTests {
         assertEquals("owner", jdbc.queryForObject("SELECT role FROM server_members", String.class));
         assertEquals(0, jdbc.queryForObject("SELECT token_version FROM users", Integer.class));
         assertNull(jdbc.queryForObject("SELECT deleted_at FROM messages", Object.class));
+        assertNotNull(jdbc.queryForObject("SELECT read_at FROM channel_reads WHERE channel_id = ? AND user_id = ?",
+                java.sql.Timestamp.class, channelId, userId));
         validateEntities(dataSource);
         assertApiRolesRestricted(jdbc);
         assertEquals(0, flyway.migrate().migrationsExecuted);
@@ -160,7 +168,7 @@ class PostgresMigrationTests {
     private static MetadataSources metadata(org.hibernate.service.ServiceRegistry registry) {
         var metadata = new MetadataSources(registry);
         for (var type : List.of(User.class, Server.class, Channel.class, ServerMember.class,
-                DirectMessage.class, Message.class, Friendship.class, ServerInvitation.class, AuthSession.class, UserBlock.class)) {
+                DirectMessage.class, Message.class, Friendship.class, ServerInvitation.class, AuthSession.class, UserBlock.class, ChannelRead.class)) {
             metadata.addAnnotatedClass(type);
         }
         return metadata;
@@ -177,7 +185,7 @@ class PostgresMigrationTests {
 
     private static void assertApiRolesRestricted(JdbcTemplate jdbc) {
         for (var table : List.of("app_users", "users", "servers", "channels", "server_members",
-                "direct_messages", "messages", "friendships", "server_invitations", "auth_sessions", "user_blocks")) {
+                "direct_messages", "messages", "friendships", "server_invitations", "auth_sessions", "user_blocks", "channel_reads", "message_mentions")) {
             assertEquals(Boolean.TRUE, jdbc.queryForObject(
                     "SELECT relrowsecurity FROM pg_class WHERE oid = CAST(? AS regclass)", Boolean.class, table));
             for (var role : List.of("anon", "authenticated")) {

@@ -22,6 +22,21 @@ import java.util.concurrent.TimeUnit;
 public class ServerController {
 
     private final ServerService serverService;
+    private final com.matteo.chat_backend.service.ChannelActivityService channelActivityService;
+
+    @GetMapping("/activity")
+    public ResponseEntity<?> activity(Principal principal) {
+        return ResponseEntity.ok(channelActivityService.activity(principal.getName()));
+    }
+
+    public record ChannelReadRequest(@jakarta.validation.constraints.NotNull UUID messageId) {}
+
+    @PostMapping("/channels/{channelId}/read")
+    public ResponseEntity<Void> readChannel(@PathVariable UUID channelId,
+            @Valid @RequestBody ChannelReadRequest request, Principal principal) {
+        channelActivityService.markRead(channelId, request.messageId(), principal.getName());
+        return ResponseEntity.noContent().build();
+    }
 
     @PostMapping
     public ResponseEntity<ServerResponse> createServer(

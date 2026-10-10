@@ -33,6 +33,7 @@ public class MessageService {
     private final MessageCryptoService cryptoService;
     private final RequestRateLimiter rateLimiter;
     private final AttachmentStorageService attachmentStorageService;
+    private final ChannelActivityService channelActivityService;
 
     @Transactional
     public MessageResponse saveMessage(MessageRequest request, String senderEmail) {
@@ -107,6 +108,7 @@ public class MessageService {
                 message.setAttachmentContentType(attachment.contentType());
                 message.setAttachmentSize(attachment.size());
             }
+            channelActivityService.updateMentions(message, content);
             Message saved = messageRepository.save(message);
             if (saved.getDirectMessage() != null) {
                 directMessageRepository.recordActivity(saved.getDirectMessage().getId(), saved.getCreatedAt());
@@ -218,6 +220,7 @@ public class MessageService {
         }
         message.setContent(cryptoService.encrypt(content.trim()));
         message.setEdited(true);
+        channelActivityService.updateMentions(message, content.trim());
         return toResponse(messageRepository.save(message));
     }
 
@@ -228,6 +231,7 @@ public class MessageService {
         response.setContent("");
         response.setDeleted(true);
         message.setDeletedAt(LocalDateTime.now());
+        channelActivityService.updateMentions(message, "");
         messageRepository.save(message);
         attachmentStorageService.delete(message.getAttachmentKey());
         return response;
@@ -249,7 +253,7 @@ public class MessageService {
     }
 
     private MessageResponse toResponse(Message message) {
-        return new MessageResponse(
+        var response = new MessageResponse(
                 message.getId(),
                 cryptoService.decrypt(message.getContent()),
                 message.getSender().getId(),
@@ -270,6 +274,8 @@ public class MessageService {
                 message.getClientMessageId(),
                 recipientReadAt(message)
         );
+        response.setMentionedUserIds(java.util.List.copyOf(message.getMentionedUserIds()));
+        return response;
     }
 
     public com.matteo.chat_backend.dto.SharedItemsResponse getSharedItems(UUID dmId, String kind, UUID before, String email) {
