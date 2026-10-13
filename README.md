@@ -45,9 +45,13 @@ docker compose up -d
 Or create the local database in your installed PostgreSQL:
 
 ```powershell
-psql -U postgres -h localhost -p 5432 -c "CREATE USER chat_mattu WITH PASSWORD 'change_me';"
+psql -U postgres -h localhost -p 5432 -c "CREATE USER chat_mattu WITH PASSWORD 'chat_mattu';"
 psql -U postgres -h localhost -p 5432 -c "CREATE DATABASE chat_mattu OWNER chat_mattu;"
 ```
+
+These are local development defaults matching the generated `.env`. If you use
+another database name, user or password, update `DB_URL`, `DB_USERNAME` and
+`DB_PASSWORD` in that private file before starting the application.
 
 Run the backend:
 
