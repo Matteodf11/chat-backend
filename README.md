@@ -1,6 +1,12 @@
-# Chat Mattu Backend
+# Chimera · Backend
 
-Backend for a Discord-style chat application built with Java 21 and Spring Boot.
+Java 21 / Spring Boot backend for Chimera, a messaging application for Android
+and Windows. Provides authentication with renewable sessions, private and server
+messaging, roles, invitations, read state, mentions and media storage.
+
+See the [Chimera client](https://github.com/Matteodf11/chat-app) for screenshots,
+features and the demonstration guide. This repository contains the API,
+WebSocket integration, database migrations and backend tests.
 
 ## Tech Stack
 
