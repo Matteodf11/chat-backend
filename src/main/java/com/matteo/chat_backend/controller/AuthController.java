@@ -32,7 +32,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
         String address = clientAddress(servletRequest);
-        rateLimiter.requireCapacity("login-ip:" + address, 30, Duration.ofMinutes(15), "Demasiados intentos de inicio de sesion");
+        rateLimiter.requireCapacity("login-ip:" + address, 30, Duration.ofMinutes(15), "Demasiados intentos de inicio de sesión");
         rateLimiter.requireCapacity("login-account:" + request.getEmail().toLowerCase(), 10, Duration.ofMinutes(15), "Demasiados intentos para esta cuenta");
         return ResponseEntity.ok(authService.login(request));
     }

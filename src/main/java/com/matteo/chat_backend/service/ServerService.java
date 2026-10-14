@@ -186,7 +186,7 @@ public class ServerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Miembro no encontrado"));
         ServerMember target = requireMember(server, targetUser);
         if (server.getOwner().getId().equals(targetUserId) || "owner".equals(target.getRole())) {
-            throw new ValidationException("No puedes cambiar el rol del dueno");
+            throw new ValidationException("No puedes cambiar el rol del dueño");
         }
         target.setRole(role);
         ServerMemberResponse response = toMemberResponse(serverMemberRepository.save(target));
@@ -213,7 +213,7 @@ public class ServerService {
             throw new ValidationException("Usa la opcion de salir del servidor");
         }
         if (server.getOwner().getId().equals(targetUserId) || "owner".equals(target.getRole())) {
-            throw new ForbiddenException("El dueno no puede ser expulsado");
+            throw new ForbiddenException("El dueño no puede ser expulsado");
         }
         if ("admin".equals(actorMember.getRole()) && !"member".equals(target.getRole())) {
             throw new ForbiddenException("Un administrador solo puede expulsar miembros");
@@ -314,7 +314,7 @@ public class ServerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         ServerMember member = requireMember(server, user);
         if ("owner".equals(member.getRole()) || server.getOwner().getId().equals(user.getId())) {
-            throw new ValidationException("El dueno debe borrar el servidor antes de salir");
+            throw new ValidationException("El dueño debe borrar el servidor antes de salir");
         }
         member.setDeletedAt(LocalDateTime.now());
         serverMemberRepository.save(member);
@@ -327,7 +327,7 @@ public class ServerService {
         Server server = serverRepository.findActiveById(serverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recurso", "Servidor no encontrado"));
         if (!server.getOwner().getId().equals(user.getId())) {
-            throw new ForbiddenException("Solo el dueno puede borrar este servidor");
+            throw new ForbiddenException("Solo el dueño puede borrar este servidor");
         }
 
         List<String> memberEmails = serverMemberRepository.findByServer(server).stream()
@@ -412,7 +412,7 @@ public class ServerService {
     private ServerMember requireOwner(Server server, User user) {
         ServerMember member = requireMember(server, user);
         if (!server.getOwner().getId().equals(user.getId()) || !"owner".equals(member.getRole())) {
-            throw new ForbiddenException("Solo el dueno puede gestionar los roles");
+            throw new ForbiddenException("Solo el dueño puede gestionar los roles");
         }
         return member;
     }

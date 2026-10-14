@@ -56,7 +56,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 if (StompCommand.CONNECT.equals(accessor.getCommand())) {
                     String authHeader = accessor.getFirstNativeHeader("Authorization");
                     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                        throw new MessageDeliveryException("Conexion WebSocket no autenticada");
+                        throw new MessageDeliveryException("Conexión WebSocket no autenticada");
                     }
                     try {
                         String token = authHeader.substring(7);

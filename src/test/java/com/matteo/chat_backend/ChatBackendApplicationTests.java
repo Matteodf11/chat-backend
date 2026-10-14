@@ -31,7 +31,8 @@ class ChatBackendApplicationTests {
 				"/api/servers/00000000-0000-0000-0000-000000000001/members/00000000-0000-0000-0000-000000000002"
 		))
 				.andExpect(status().isUnauthorized())
-				.andExpect(content().json("{\"error\":\"Sesion no valida o caducada\"}"));
+                .andExpect(content().encoding("UTF-8"))
+                .andExpect(content().json("{\"error\":\"Sesión no válida o caducada\"}"));
 	}
 
 	@Test

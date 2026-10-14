@@ -68,7 +68,7 @@ public class ChatController {
 
     private void requirePrincipal(Principal principal) {
         if (principal == null) {
-            throw new AccessDeniedException("Conexion no autenticada");
+            throw new AccessDeniedException("Conexión no autenticada");
         }
     }
 }

@@ -363,14 +363,14 @@ public class MessageService {
             throw new IllegalArgumentException("La fecha inicial no puede ser posterior a la final");
         }
         rateLimiter.requireCapacity("message-search:" + requesterEmail, 12, Duration.ofMinutes(1),
-                "Demasiadas busquedas, espera un momento");
+                "Demasiadas búsquedas, espera un momento");
     }
 
     private String normalizeSearchText(String value, int maxLength) {
         if (value == null) return "";
         String normalized = value.trim().toLowerCase(Locale.ROOT);
         if (normalized.length() > maxLength) {
-            throw new IllegalArgumentException("El filtro de busqueda es demasiado largo");
+            throw new IllegalArgumentException("El filtro de búsqueda es demasiado largo");
         }
         return normalized;
     }
