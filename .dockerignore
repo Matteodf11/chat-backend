@@ -1,0 +1,16 @@
+.git
+.github
+.idea
+target
+build
+.env
+.env.*
+OpenCode.txt
+DeepAnalisis.txt
+src/main/resources/application.properties
+src/main/resources/application-local.properties
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pfx
+**/*.key

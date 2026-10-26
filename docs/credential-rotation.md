@@ -1,7 +1,12 @@
 # Credential rotation: Render + Supabase
 
-Status: code prepared locally; NO credentials have been rotated and NO service
-has been deployed. Do not paste secrets into chat, reports, Git or screenshots.
+Status update, 26 October 2026: the owner confirmed that the PostgreSQL password
+was changed, the Render connection was updated, and the service works. This is
+owner confirmation, not independent provider-side verification. Rotation of other
+credentials is not established by that confirmation. Historical private database
+configuration is excluded from the sanitized publication history. The original
+private recovery bundle must never be uploaded or made public.
+Do not paste secrets into chat, reports, Git or screenshots.
 Store new values in a password manager and the intended service's secret settings.
 
 Private application.properties/application-local.properties are excluded from

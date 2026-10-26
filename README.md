@@ -8,6 +8,12 @@ See the [Chimera client](https://github.com/Matteodf11/chat-app) for screenshots
 features and the demonstration guide. This repository contains the API,
 WebSocket integration, database migrations and backend tests.
 
+The client repository also includes a [complete Spanish learning guide](https://github.com/Matteodf11/chat-app/blob/master/docs/guia-completa-chimera.md)
+covering both applications, architecture, data flows, security and deployment.
+For a shorter overview, start with the [component guide](https://github.com/Matteodf11/chat-app/blob/master/docs/guia-rapida-chimera.md).
+
+See [SECURITY.md](SECURITY.md) for demonstration boundaries and credential handling.
+
 ## Tech Stack
 
 - Java 21

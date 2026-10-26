@@ -1,0 +1,17 @@
+title = "Chimera secret detection"
+
+[extend]
+useDefault = true
+
+# JDBC URLs may carry passwords in query parameters rather than user:password@.
+[[rules]]
+id = "database-query-password"
+description = "Literal password in a database connection query"
+regex = '''(?i)[?&]password=([^\s&"'<>]+)'''
+secretGroup = 1
+keywords = ["password="]
+
+[[rules.allowlists]]
+description = "Environment-variable reference, not a literal credential"
+regexTarget = "secret"
+regexes = ['''^\$\{[A-Z_][A-Z0-9_]*(?::[^}]*)?\}$''']

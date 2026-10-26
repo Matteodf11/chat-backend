@@ -6,8 +6,13 @@ target/
 
 ### Secrets ###
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
 
 # Raw local AI audits contain credentials. Keep only sanitized findings in docs.
 /OpenCode.txt
